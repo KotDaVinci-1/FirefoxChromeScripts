@@ -1,7 +1,8 @@
-﻿// ==UserScript==
+// ==UserScript==
 // @name			Многоцветное автовыделение 
 // @description		Кнопка позволяет "подсветить" на странице несколько слов одновременно разными цветами.
 // @compatibility	Firefox 152 
+// @version			1.0.1 Изменён способ вывода иконок в меню кнопки.
 // @version			1.0.0 (релиз)
 // @homepage		https://github.com/KotDaVinci-1/FirefoxChromeScripts
 // ==/UserScript==
@@ -175,6 +176,15 @@ if (!ChromeUtils.domProcessChild.childID) {
 					  23%, 27% { fill: rgb(0, 255, 0);}
 					  48%, 52% { fill: rgb(12, 208, 255);}
 					  73%, 77% { fill: rgb(255, 96, 252);}
+					}
+					/* Иконка */
+					#uc_text_highlighter menuitem.menuitem-iconic[data-slot] .menu-icon {
+						-moz-context-properties: fill !important;
+						fill: var(--slot-color) !important;
+						content: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16'%3E%3Ccircle cx='8' cy='8' r='7' fill='context-fill' stroke='rgba(0,0,0,0.5)' stroke-width='1'/%3E%3C/svg%3E") !important;
+					}
+					#uc_text_highlighter menuitem.menuitem-iconic[data-active] .menu-icon {
+						content: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16'%3E%3Cpolygon points='1,1 1,15 15,8' fill='context-fill' stroke='rgba(0,0,0,0.5)' stroke-width='1'/%3E%3C/svg%3E") !important;
 					}
 				`;
 				doc.documentElement.appendChild(style);
@@ -362,6 +372,7 @@ if (!ChromeUtils.domProcessChild.childID) {
 					canvas.width = Math.round(14 * chromeDPR);
 					const canvasPhysicalHeight = Math.round(winHeight * currentDPR);
 					canvas.height = canvasPhysicalHeight;
+
 					let ctx = canvas.getContext('2d');
 					ctx.clearRect(0, 0, canvas.width, canvas.height);
 					// Перевод отступов в физические пиксели экрана.
@@ -635,15 +646,12 @@ if (!ChromeUtils.domProcessChild.childID) {
 					let item = doc.createXULElement("menuitem");
 					item.setAttribute("class", "menuitem-iconic");
 					item.setAttribute("data-slot", i); 
-
-					let svgActive = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"><polygon points="1,1 1,15 15,8" fill="${COLORS[i-1]}" stroke="rgba(0,0,0,0.5)" stroke-width="1"/></svg>`;
-					let b64Active = `data:image/svg+xml;base64,${btoa(svgActive)}`;
-					let svgInactive = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"><circle cx="8" cy="8" r="7" fill="${COLORS[i-1]}" stroke="rgba(0,0,0,0.5)" stroke-width="1"/></svg>`;
-					let b64Inactive = `data:image/svg+xml;base64,${btoa(svgInactive)}`;
-
-					item.setAttribute("data-icon-active", b64Active);
-					item.setAttribute("data-icon-inactive", b64Inactive);
-					item.setAttribute("image", (currentIndex === i) ? b64Active : b64Inactive);
+					// Передаем цвет в CSS:
+					item.style.setProperty("--slot-color", COLORS[i-1]);
+					// Помечаем активный слот:
+					if (currentIndex === i) {
+						item.setAttribute("data-active", "true");
+					}
 
 					let displayStr = text.trim() === "" ? "[Пусто]" : text;
 					item.setAttribute("label", `Слот ${i}: ${displayStr}`);
@@ -737,11 +745,8 @@ if (!ChromeUtils.domProcessChild.childID) {
 					let menuItems = popup.querySelectorAll("menuitem[data-slot]");
 					menuItems.forEach(item => {
 						let slotIndex = parseInt(item.getAttribute("data-slot"));
-						if (slotIndex === currentIndex) {
-							item.setAttribute("image", item.getAttribute("data-icon-active"));
-						} else {
-							item.setAttribute("image", item.getAttribute("data-icon-inactive"));
-						}
+						// Если слот совпадает с текущим индексом, добавляется data-active
+						item.toggleAttribute("data-active", slotIndex === currentIndex);
 					});
 				}
 				if (btn.getAttribute("data-highlighted") === "true") {
