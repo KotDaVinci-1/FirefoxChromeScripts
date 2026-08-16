@@ -2,6 +2,7 @@
 // @name			Многоцветное автовыделение 
 // @description		Кнопка позволяет "подсветить" на странице несколько слов одновременно разными цветами.
 // @compatibility	Firefox 152 
+// @version			1.0.2 Количество "слотов" теперь автоматически вычисляется из количества цветов.
 // @version			1.0.1 Изменён способ вывода иконок в меню кнопки.
 // @version			1.0.0 (релиз)
 // @homepage		https://github.com/KotDaVinci-1/FirefoxChromeScripts
@@ -31,7 +32,7 @@ if (!ChromeUtils.domProcessChild.childID) {
 		}
 
 		const defaults = ["сюда", "нужно", "вписать", "всякие", "разные", "слова"];
-		for (let i = 1; i <= 6; i++) {
+		for (let i = 1; i <= COLORS.length; i++) {
 			let prefName = `${PREF_PREFIX}text.${i}`;
 			if (!Services.prefs.prefHasUserValue(prefName)) {
 				Services.prefs.setStringPref(prefName, defaults[i-1]);
@@ -42,7 +43,7 @@ if (!ChromeUtils.domProcessChild.childID) {
 
 	const getHighlightsFromPrefs = () => {
 		let highlights = [];
-		for (let i = 1; i <= 6; i++) {
+		for (let i = 1; i <= COLORS.length; i++) {
 			try {
 				let text = Services.prefs.getStringPref(`${PREF_PREFIX}text.${i}`);
 				if (text && text.trim() !== "") {
@@ -111,7 +112,7 @@ if (!ChromeUtils.domProcessChild.childID) {
 
 		try {
 			let currentIndex = Services.prefs.getIntPref(PREF_PREFIX + "index");
-			if (currentIndex < 1 || currentIndex > 6) currentIndex = 1;
+			if (currentIndex < 1 || currentIndex > COLORS.length) currentIndex = 1;
 
 			let oldText = "";
 			try { oldText = Services.prefs.getStringPref(`${PREF_PREFIX}text.${currentIndex}`); } catch(e){}
@@ -119,7 +120,7 @@ if (!ChromeUtils.domProcessChild.childID) {
 
 			Services.prefs.setStringPref(`${PREF_PREFIX}text.${currentIndex}`, textToSave);
 
-			let nextIndex = (currentIndex % 6) + 1;
+			let nextIndex = (currentIndex % COLORS.length) + 1;
 			Services.prefs.setIntPref(PREF_PREFIX + "index", nextIndex);
 			updateBadge();
 
@@ -230,8 +231,9 @@ if (!ChromeUtils.domProcessChild.childID) {
 				const highlightsArray = args.highlights;
 				const matchCase = args.matchCase;
 				const matchDiacritics = args.matchDiacritics;
+				const slotCount = args.slotCount;
 
-				for (let i = 0; i < 6; i++) {
+				for (let i = 0; i < slotCount; i++) {
 					CSS.highlights.delete(`uc-highlight-${i}`);
 				}
 
@@ -471,7 +473,8 @@ if (!ChromeUtils.domProcessChild.childID) {
 					highlights: currentHighlights, 
 					matchCase: matchCase, 
 					matchDiacritics: matchDiacritics,
-					chromeDPR: win.devicePixelRatio // Эталонный масштаб системы
+					chromeDPR: win.devicePixelRatio, // Эталонный масштаб системы
+					slotCount: COLORS.length // кол-во цветов = кол-во слотов
 				};
 
 				let codeToInject = `(${highlightScript.toString()})(${JSON.stringify(args)});`;
@@ -533,7 +536,7 @@ if (!ChromeUtils.domProcessChild.childID) {
 										}
 										let style = content.document.getElementById('uc-highlight-api-styles');
 										if (style) style.remove();
-										
+
 										let canvas = content.document.getElementById('uc-highlight-scrollbar-markers');
 										if (canvas) canvas.remove();
 										content.window._ucHighlightSavedRanges = null;
@@ -639,7 +642,7 @@ if (!ChromeUtils.domProcessChild.childID) {
 				let currentIndex = 1;
 				try { currentIndex = Services.prefs.getIntPref(PREF_PREFIX + "index"); } catch(ex){}
 
-				for (let i = 1; i <= 6; i++) {
+				for (let i = 1; i <= COLORS.length; i++) {
 					let text = "";
 					try { text = Services.prefs.getStringPref(`${PREF_PREFIX}text.${i}`); } catch(ex){}
 
@@ -711,7 +714,7 @@ if (!ChromeUtils.domProcessChild.childID) {
 				clearAll.setAttribute("image", "chrome://global/skin/icons/delete.svg");
 				clearAll.setAttribute("label", "Очистить все слоты");
 				clearAll.addEventListener("command", () => {
-					for(let i = 1; i <= 6; i++) {
+					for(let i = 1; i <= COLORS.length; i++) {
 						Services.prefs.setStringPref(`${PREF_PREFIX}text.${i}`, "");
 					}
 					Services.prefs.setIntPref(PREF_PREFIX + "index", 1);
@@ -734,9 +737,9 @@ if (!ChromeUtils.domProcessChild.childID) {
 				let currentIndex = 1;
 				try { currentIndex = Services.prefs.getIntPref(PREF_PREFIX + "index"); } catch(ex){}
 				if (e.deltaY > 0) {
-					currentIndex = (currentIndex >= 6) ? 1 : currentIndex + 1; 
+					currentIndex = (currentIndex >= COLORS.length) ? 1 : currentIndex + 1; 
 				} else {
-					currentIndex = (currentIndex <= 1) ? 6 : currentIndex - 1; 
+					currentIndex = (currentIndex <= 1) ? COLORS.length : currentIndex - 1; 
 				}
 				Services.prefs.setIntPref(PREF_PREFIX + "index", currentIndex);
 				updateBadge();
