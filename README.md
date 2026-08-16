@@ -8,7 +8,8 @@
 
 ## Менеджер скриптов `rebuild_userChrome.uc.js`
 Кнопка с меню для управления пользовательскими `.uc.js`, `.uc.mjs` и `.sys.mjs` скриптами (`rebuild_userChrome.uc.js` исключён из списка). Разработано специально для загрузчика от [MrOtherGuy](https://github.com/MrOtherGuy/fx-autoconfig).
-
+* [Ссылка на страницу](userChromeJS/rebuild_userChrome.uc.js)
+* [Ссылка на raw](https://raw.githubusercontent.com/KotDaVinci-1/FirefoxChromeScripts/main/userChromeJS/rebuild_userChrome.uc.js)
 ### Основные возможности:
 * **Управление скриптами:** Включение и отключение скриптов из меню кнопки (изменения применяются после перезапуска браузера).
 * **Динамическое обновление списка:** Меню и метаданные формируются «на лету» при каждом открытии. В отличие от встроенного меню загрузчика, новые файлы или изменения в описаниях скриптов появляются в списке сразу, без необходимости перезапускать браузер.
@@ -42,7 +43,8 @@
 
 ## Управление масштабом `uc_zoom_control.uc.js`
 Кнопка для управления масштабом страницы.
-
+* [Ссылка на страницу](userChromeJS/uc_zoom_control.uc.js)
+* [Ссылка на raw](https://raw.githubusercontent.com/KotDaVinci-1/FirefoxChromeScripts/main/userChromeJS/uc_zoom_control.uc.js)
 ### Управление:
 - **ЛКМ** — 100%.
 - **Прокрутка колёсиком** — изменить масштаб.
@@ -72,7 +74,8 @@ P/PAGE - масштаб всей страницы. T/TEXT - масштаб те�
 
 ## Вставить и перейти `uc_paste_and_go.uc.js`
 Кнопка для открытия содержимого буфера обмена в новой вкладке.
-
+* [Ссылка на страницу](userChromeJS/uc_paste_and_go.uc.js)
+* [Ссылка на raw](https://raw.githubusercontent.com/KotDaVinci-1/FirefoxChromeScripts/main/userChromeJS/uc_paste_and_go.uc.js)
 ### Управление:
 - **ЛКМ по кнопке** — открыть содержимое буфера обмена в новой вкладке.
 - **Ctrl+Shift+V** — выполнить то же действие (можно отключить).
@@ -87,7 +90,8 @@ P/PAGE - масштаб всей страницы. T/TEXT - масштаб те�
 
 ## Яндекс Картинки `uc_yandex_images.uc.js`
 Пример кнопки-закладки для открытия заранее заданного адреса.
-
+* [Ссылка на страницу](userChromeJS/uc_yandex_images.uc.js)
+* [Ссылка на raw](https://raw.githubusercontent.com/KotDaVinci-1/FirefoxChromeScripts/main/userChromeJS/uc_yandex_images.uc.js)
 ### Управление:
 - **ЛКМ** — открыть ссылку в новой активной вкладке.
 - **СКМ** — открыть ссылку в новой фоновой вкладке.
@@ -101,7 +105,8 @@ P/PAGE - масштаб всей страницы. T/TEXT - масштаб те�
 
 ## Перейти `uc_go_button.uc.js`
 Постоянно доступный аналог кнопки **«Перейти»** из адресной строки.
-
+* [Ссылка на страницу](userChromeJS/uc_go_button.uc.js)
+* [Ссылка на raw](https://raw.githubusercontent.com/KotDaVinci-1/FirefoxChromeScripts/main/userChromeJS/uc_go_button.uc.js)
 ### Управление:
 - **ЛКМ** — выполнить переход по адресу, указанному в адресной строке.
 ### Особенности:
@@ -111,7 +116,8 @@ P/PAGE - масштаб всей страницы. T/TEXT - масштаб те�
 
 ## Подсветка ссылок `uc_link_highlighter.uc.js`
 Подсвечивает ссылки в зависимости от их типа.
-
+* [Ссылка на страницу](userChromeJS/uc_link_highlighter.uc.js)
+* [Ссылка на raw](https://raw.githubusercontent.com/KotDaVinci-1/FirefoxChromeScripts/main/userChromeJS/uc_link_highlighter.uc.js)
 ### Управление:
 - **ЛКМ** — включить/выключить подсветку.
 
@@ -136,7 +142,8 @@ P/PAGE - масштаб всей страницы. T/TEXT - масштаб те�
 
 ## Улучшенный Findbar `uc_findbar_func.uc.js`
 Добавляет в панель поиска дополнительные функции и улучшает её поведение.
-
+* [Ссылка на страницу](userChromeJS/uc_findbar_func.uc.js)
+* [Ссылка на raw](https://raw.githubusercontent.com/KotDaVinci-1/FirefoxChromeScripts/main/userChromeJS/uc_findbar_func.uc.js)
 ### Управление:
 - **Колёсико над панелью поиска** — переход к следующему/предыдущему совпадению.
 - **ЛКМ по кнопке** — вставить текст из буфера обмена.
@@ -164,9 +171,9 @@ P/PAGE - масштаб всей страницы. T/TEXT - масштаб те�
 
 ## Удалить закладку текущей страницы `uc_context_remove_bookmark.uc.js`
 Добавляет в контекстное меню страницы пункт для удаления закладок текущей страницы.
-
+* [Ссылка на страницу](userChromeJS/uc_context_remove_bookmark.uc.js)
+* [Ссылка на raw](https://raw.githubusercontent.com/KotDaVinci-1/FirefoxChromeScripts/main/userChromeJS/uc_context_remove_bookmark.uc.js)
 ### Управление:
-
 - **ПКМ по странице → «Удалить эту страницу из закладок»** — удалить все закладки, ведущие на текущую страницу.
 
 ### Особенности:
@@ -197,7 +204,8 @@ P/PAGE - масштаб всей страницы. T/TEXT - масштаб те�
 
 ## Редактор закладок+ `uc_resizableBookmarkPanel.uc.js`
 Улучшает панель редактирования закладок.
-
+* [Ссылка на страницу](userChromeJS/uc_resizableBookmarkPanel.uc.js)
+* [Ссылка на raw](https://raw.githubusercontent.com/KotDaVinci-1/FirefoxChromeScripts/main/userChromeJS/uc_resizableBookmarkPanel.uc.js)
 ### Возможности:
 - Изменяемый размер панели с сохранением между запусками.
 - Автоматическое раскрытие дерева папок.
@@ -220,7 +228,8 @@ P/PAGE - масштаб всей страницы. T/TEXT - масштаб те�
 
 ## Вставка символов `uc_insert_symbols.uc.js`
 Кнопка с меню специальных символов и эмодзи.
-
+* [Ссылка на страницу](userChromeJS/uc_insert_symbols.uc.js)
+* [Ссылка на raw](https://raw.githubusercontent.com/KotDaVinci-1/FirefoxChromeScripts/main/userChromeJS/uc_insert_symbols.uc.js)
 ### Управление:
 - **ЛКМ по кнопке** — открыть меню символов.
 - **СКМ по кнопке** — открыть Таблицу символов Windows.
@@ -240,7 +249,8 @@ P/PAGE - масштаб всей страницы. T/TEXT - масштаб те�
 
 ## Вставка символов Plus `uc_insert_symbols_plus.uc.js`
 Расширенная версия скрипта **«Вставка символов»**. Помимо вставки отдельных символов позволяет вставлять готовые текстовые шаблоны и использовать содержимое буфера обмена.
-
+* [Ссылка на страницу](userChromeJS/uc_insert_symbols_plus.uc.js)
+* [Ссылка на raw](https://raw.githubusercontent.com/KotDaVinci-1/FirefoxChromeScripts/main/userChromeJS/uc_insert_symbols_plus.uc.js)
 ### Основные возможности:
 - Все возможности скрипта **«Вставка символов»**.
 - Вставка готовых фраз и многострочных шаблонов.
@@ -264,7 +274,8 @@ P/PAGE - масштаб всей страницы. T/TEXT - масштаб те�
 ---
 
 ## Многоцветное автовыделение `uc_text_highlighter.uc.js`
-
+* [Ссылка на страницу](userChromeJS/uc_text_highlighter.uc.js)
+* [Ссылка на raw](https://raw.githubusercontent.com/KotDaVinci-1/FirefoxChromeScripts/main/userChromeJS/uc_text_highlighter.uc.js)
 Скрипт для одновременной подсветки произвольных слов и фраз на веб-страницах несколькими цветами. 
 
 Использует современный **CSS Custom Highlight API**: подсветка накладывается поверх уже отрисованного текста без изменения DOM. Благодаря этому сохраняется работоспособность ссылок и форматирования, а поиск корректно находит фразы, даже если они пересекают разные HTML-теги.
@@ -314,7 +325,8 @@ P/PAGE - масштаб всей страницы. T/TEXT - масштаб те�
 
 ## Добавить закладку в папку `uc_add_bookmar.uc.js`
 Добавляет текущую страницу в выбранную папку на панели закладок.
-
+* [Ссылка на страницу](userChromeJS/uc_add_bookmar.uc.js)
+* [Ссылка на raw](https://raw.githubusercontent.com/KotDaVinci-1/FirefoxChromeScripts/main/userChromeJS/uc_add_bookmar.uc.js)
 ### Управление:
 
 - **Двойной ЛКМ по папке на панели закладок** — добавить текущую страницу в эту папку.
