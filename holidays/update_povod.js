@@ -53,7 +53,7 @@ async function run() {
             data.days.forEach(day => {
                 if (day.holidays && day.holidays.length > 0) {
                     let cleanHolidays = [...new Set(day.holidays.filter(h => 
-                        !h.includes("Выходной") && !h.includes("каникулы")
+                        !h.includes("Выходной")
                     ))];
                     
                     if (cleanHolidays.length > 0) {
