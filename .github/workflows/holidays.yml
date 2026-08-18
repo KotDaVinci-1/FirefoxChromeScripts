@@ -1,0 +1,37 @@
+name: Update Holidays
+
+on:
+  schedule:
+    - cron: '0 4 * * *'
+  workflow_dispatch:
+
+jobs:
+  update-data:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+          
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24' # Обновили до актуальной версии
+              
+      - name: Run parser script
+        run: node holidays/update_povod.js
+            
+      - name: Commit and Push changes
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          
+          # Добавляем все изменения в текущей директории
+          git add -A
+          
+          # Если изменений нет (файлы идентичны), git commit выдаст ошибку, которую мы проглотим || true
+          git commit -m "Auto-update: povod.json and status" || true
+          
+          # Пушим. Если коммита не было, git push просто ничего не сделает
+          git push || true
