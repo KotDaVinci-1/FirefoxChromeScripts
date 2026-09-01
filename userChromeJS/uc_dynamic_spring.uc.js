@@ -2,6 +2,7 @@
 // @name			Инфо-пробел
 // @description		Расширяющийся пробел с заголовком и виджетами
 // @compatibility	Firefox 153
+// @version			1.0.1 В виджет погоды добавлена всплывающая подсказка с названием города.
 // @version			1.0.0 (релиз)
 // @homepage		https://github.com/KotDaVinci-1/FirefoxChromeScripts
 // ==/UserScript==
@@ -13,13 +14,13 @@
 	const CONFIG = {
 		modules: {
 			MEMORY: 1,		// 0 - Откл; 1 - Слева;  2 - Справа		(память)
-			CPU: 1,			// 0 - Откл; 1 - Слева;  2 - Справа		(погода)
+			CPU: 1,			// 0 - Откл; 1 - Слева;  2 - Справа		(CPU)
 			GFX: 1,			// 0 - Откл; 1 - Слева;  2 - Справа		(графика)
 			WEATHER: 2,		// 0 - Откл; 1 - Слева;  2 - Справа		(погода)
 			DATEW: 2,		// 0 - Откл; 1 - Слева;  2 - Справа		(дата)
-			BASIS: 2,		// 0 - Только виджеты; 1 - 0 + Расширяющийся пробел; 2 - 1 + заголовок страницы
+			BASIS: 2,		// 0 - Только виджеты;	 1 - Виджеты и расширяющийся пробел;   2 - заголовок страницы на расширяющемся пробеле
 			WICONS: true,	// Иконка погоды
-			POVOD: true		// Праздники
+			POVOD: true		// Всплывающая подсказка с праздниками для модуля "дата" 
 		},
 
 		stylesBase: `
@@ -293,6 +294,13 @@
 				if (!(await IOUtils.exists(weatherFile))) return;
 
 				const data = await IOUtils.readJSON(weatherFile);
+
+				// Выставляем название города во всплывающую подсказку
+				if (data?.locationData?.city) {
+					weatherBox.setAttribute("tooltiptext", data.locationData.city);
+				} else {
+					weatherBox.removeAttribute("tooltiptext");
+				}
 
 				// Извлекаем только базовую температуру и ID иконки
 				if (data?.weather?.suggestions?.[0]?.current_conditions) {
