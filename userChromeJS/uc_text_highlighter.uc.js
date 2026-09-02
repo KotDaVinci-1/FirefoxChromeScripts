@@ -2,6 +2,7 @@
 // @name			Многоцветное автовыделение 
 // @description		Кнопка позволяет "подсветить" на странице несколько слов одновременно разными цветами.
 // @compatibility	Firefox 152 
+// @version			1.1.0 Новый способ инъекции подсветки текста в страницу (теперь подсветка работает даже на сайтах с параноидальными настройками Content Security Policy).
 // @version			1.0.2 Количество "слотов" теперь автоматически вычисляется из количества цветов.
 // @version			1.0.1 Изменён способ вывода иконок в меню кнопки.
 // @version			1.0.0 (релиз)
@@ -18,6 +19,23 @@ if (!ChromeUtils.domProcessChild.childID) {
 	const PREF_PREFIX = "uc.highlighter.";
 
 	const MAX_LENGTH = 50;
+
+	// --- Глобальные стили ---
+	const registerGlobalStyles = () => {
+		let cssStr = "";
+		for (let i = 0; i < COLORS.length; i++) {
+			cssStr += `::highlight(uc-highlight-${i}) { background-color: ${COLORS[i]} !important; color: #000 !important; }\n`;
+		}
+
+		let sss = Components.classes["@mozilla.org/content/style-sheet-service;1"]
+					.getService(Components.interfaces.nsIStyleSheetService);
+		let uri = Services.io.newURI("data:text/css;charset=utf-8," + encodeURIComponent(cssStr));
+		// Регистрация как USER_SHEET (стиль пользователя), он обходит любые CSP страниц
+		if (!sss.sheetRegistered(uri, sss.USER_SHEET)) {
+			sss.loadAndRegisterSheet(uri, sss.USER_SHEET);
+		}
+	};
+	registerGlobalStyles();
 
 	const initPrefs = () => {
 		if (!Services.prefs.prefHasUserValue(PREF_PREFIX + "index")) {
@@ -47,7 +65,7 @@ if (!ChromeUtils.domProcessChild.childID) {
 			try {
 				let text = Services.prefs.getStringPref(`${PREF_PREFIX}text.${i}`);
 				if (text && text.trim() !== "") {
-					highlights.push({ text: text, color: COLORS[i-1] });
+					highlights.push({ text: text, color: COLORS[i-1], slotId: i - 1 });
 				}
 			} catch (e) {
 				console.error(`[UC] Ошибка чтения настройки text.${i}:`, e);
@@ -237,24 +255,6 @@ if (!ChromeUtils.domProcessChild.childID) {
 					CSS.highlights.delete(`uc-highlight-${i}`);
 				}
 
-				let style = document.getElementById('uc-highlight-api-styles');
-				
-				if (!highlightsArray || !highlightsArray.length) {
-					if (style) style.remove();
-					let canvas = document.getElementById('uc-highlight-scrollbar-markers');
-					if (canvas) canvas.remove();
-					return;
-				}
-
-				if (!style) {
-					style = document.createElement('style');
-					style.id = 'uc-highlight-api-styles';
-					document.head.appendChild(style);
-				}
-				style.textContent = highlightsArray.map((item, i) => 
-					`::highlight(uc-highlight-${i}) { background-color: ${item.color} !important; color: black !important; }`
-				).join(' ');
-
 				const flatten = (str) => {
 					let res = str;
 					if (!matchDiacritics) res = res.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -298,7 +298,7 @@ if (!ChromeUtils.domProcessChild.childID) {
 				let allMarkers = [];  // Массив для сбора координат маркеров скроллбара
 				let savedRanges = []; // Массив для "живых" ссылок на DOM
 
-				highlightsArray.forEach((item, index) => {
+				highlightsArray.forEach((item) => {
 					let searchStr = flatten(item.text);
 					if (!searchStr) return;
 					
@@ -338,7 +338,7 @@ if (!ChromeUtils.domProcessChild.childID) {
 					}
 
 					if (ranges.length) {
-						CSS.highlights.set(`uc-highlight-${index}`, new Highlight(...ranges));
+						CSS.highlights.set(`uc-highlight-${item.slotId}`, new Highlight(...ranges));
 						// Сбор координат для отрисовки маркеров на скроллбаре
 						ranges.forEach(range => {
 							let rects = range.getClientRects();
@@ -440,8 +440,6 @@ if (!ChromeUtils.domProcessChild.childID) {
 				if (window.CSS && CSS.highlights) {
 					CSS.highlights.clear();
 				}
-				let style = document.getElementById('uc-highlight-api-styles');
-				if (style) style.remove();
 
 				let canvas = document.getElementById('uc-highlight-scrollbar-markers');
 				if (canvas) canvas.remove();
@@ -534,9 +532,6 @@ if (!ChromeUtils.domProcessChild.childID) {
 										if (content.CSS && content.CSS.highlights) {
 											content.CSS.highlights.clear();
 										}
-										let style = content.document.getElementById('uc-highlight-api-styles');
-										if (style) style.remove();
-
 										let canvas = content.document.getElementById('uc-highlight-scrollbar-markers');
 										if (canvas) canvas.remove();
 										content.window._ucHighlightSavedRanges = null;
