@@ -2,6 +2,7 @@
 // @name			Инфо-пробел
 // @description		Расширяющийся пробел с заголовком и виджетами
 // @compatibility	Firefox 153
+// @version			1.0.2 Для подсказки виджета даты добавлен альтернативный источник данных.
 // @version			1.0.1 В виджет погоды добавлена всплывающая подсказка с названием города.
 // @version			1.0.0 (релиз)
 // @homepage		https://github.com/KotDaVinci-1/FirefoxChromeScripts
@@ -427,32 +428,51 @@
 		updatePovodTooltip: async function(dateEl) {
 			const PREF_LAST = "uc.module.date.povod.last_update";
 			const PREF_TEXT = "uc.module.date.povod.tooltip_text";
-			const RAW_URL = "https://raw.githubusercontent.com/KotDaVinci-1/FirefoxChromeScripts/main/holidays/povod.json";
+			
+			// Массив источников в порядке приоритета: Основной (GitHub) -> Резервный (Google Sheets)
+			const SOURCES = [
+				"https://raw.githubusercontent.com/KotDaVinci-1/FirefoxChromeScripts/main/holidays/povod.json",
+				"https://docs.google.com/spreadsheets/d/1PNqCvPUxSdyyw3zVbemQWE62XfBiHUC7klBt6vuWBvc/export?format=tsv&gid=771050827&range=A:A"
+			];
 
 			let getDDMM = (d) => String(d.getDate()).padStart(2, '0') + '.' + String(d.getMonth() + 1).padStart(2, '0');
 
 			let now = new Date();
-			let todayFull = getDDMM(now) + '.' + now.getFullYear(); // DD.MM.YYYY для кэша
+			let todayFull = getDDMM(now) + '.' + now.getFullYear();
 
-			// Читаем кэш из about:config
+			// 1. Читаем кэш из about:config
 			try {
 				let lastUpdate = Services.prefs.getStringPref(PREF_LAST, "");
 				let cachedText = Services.prefs.getStringPref(PREF_TEXT, "");
 
-				// Если дата актуальна, применяем сохраненный текст и отдыхаем
 				if (lastUpdate === todayFull && cachedText) {
 					dateEl.setAttribute("tooltiptext", cachedText);
 					return;
 				}
 			} catch(e) {}
 
-			// Данные устарели или их нет - вешаем временную подсказку и идем за JSON
 			dateEl.setAttribute("tooltiptext", "Сверяемся с календарем...");
 
+			// 2. Последовательный опрос источников
+			let data = null;
+
+			for (let url of SOURCES) {
+				try {
+					let response = await fetch(url, { cache: "no-store" });
+					if (!response.ok) throw new Error("HTTP " + response.status);
+					
+					let text = await response.text();
+					data = JSON.parse(text);
+					
+					// Если распарсили успешно — выходим из цикла каскада
+					break; 
+				} catch (e) { console.warn(`uc_dynamic_spring: Источник недоступен (${url}):`, e.message); }
+			}
+
+			// 3. Обработка полученных данных
 			try {
-				let response = await fetch(RAW_URL, { cache: "no-store" });
-				if (!response.ok) throw new Error("HTTP " + response.status);
-				let data = await response.json();
+				// Если ни один из источников в цикле не отдал валидный JSON
+				if (!data) throw new Error("Все источники данных недоступны");
 
 				let todayDDMM = getDDMM(now);
 				let tomorrow = new Date(now);
@@ -463,7 +483,6 @@
 				let tomorrowHolidays = data[tomorrowDDMM];
 				let tooltipText = "";
 
-				// Логика формирования текста
 				if (todayHolidays || tomorrowHolidays) {
 					let parts = [];
 					if (todayHolidays) {
@@ -474,7 +493,6 @@
 					}
 					tooltipText = parts.join("\n\n");
 				} else {
-					// Ищем ближайший праздник (прыгаем вперед до ~6 месяцев)
 					let nextDate = new Date(now);
 					let found = false;
 					for (let i = 2; i <= 200; i++) {
@@ -490,16 +508,16 @@
 					if (!found) tooltipText = "Нет предстоящих праздников в базе.";
 				}
 
-				// Сохраняем свежие данные в about:config
+				// Сохраняем данные в about:config
 				Services.prefs.setStringPref(PREF_LAST, todayFull);
 				Services.prefs.setStringPref(PREF_TEXT, tooltipText);
 
 				dateEl.setAttribute("tooltiptext", tooltipText);
 
 			} catch (err) {
-				console.error("uc_dynamic_spring: Ошибка загрузки povod.json", err);
+				console.error("uc_dynamic_spring: Ошибка обновления праздников", err);
 
-				// Если нет сети или упал GitHub, достаем старый текст (если он есть) и добавляем пометку
+				// Если и сеть упала, и Google Sheets не ответил — берем старый кэш
 				try {
 					let cachedText = Services.prefs.getStringPref(PREF_TEXT, "");
 					if (cachedText) {
