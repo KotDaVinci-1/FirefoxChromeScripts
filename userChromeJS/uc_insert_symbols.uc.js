@@ -1,7 +1,8 @@
-﻿// ==UserScript==
+// ==UserScript==
 // @name			Вставка символов
 // @description		Кнопка с меню спецсимволов и эмодзи.
-// @compatibility	Firefox 152 
+// @compatibility	Firefox 152
+// @version			1.0.1 Исправлена работа скрипта в нескольких окнах браузера.
 // @version			1.0.0 (релиз)
 // @homepage		https://github.com/KotDaVinci-1/FirefoxChromeScripts
 // ==/UserScript==
@@ -50,16 +51,14 @@
 
 	let sss = Cc["@mozilla.org/content/style-sheet-service;1"].getService(Ci.nsIStyleSheetService);
 	let uri = Services.io.newURI("data:text/css;charset=utf-8," + encodeURIComponent(CSS));
-	
+
 	// ВАЖНО: Изменен уровень с AUTHOR_SHEET на USER_SHEET, чтобы перебить !important из userChrome.css
 	if (!sss.sheetRegistered(uri, sss.USER_SHEET)) {
 		sss.loadAndRegisterSheet(uri, sss.USER_SHEET);
 	}
 
 	// ЛОГИКА ВСТАВКИ СИМВОЛОВ
-	function insertSymbol(sym) {
-			let activeEl = document.activeElement;
-
+	function insertSymbol(sym, activeEl) {
 			// Сценарий А: Фокус находится на ВЕБ-СТРАНИЦЕ (e10s / контент)
 			if (activeEl && activeEl.localName === "browser" && activeEl.isRemoteBrowser) {
 				try {
@@ -92,7 +91,7 @@
 					let script = `data:application/javascript,${encodeURIComponent(code)}`;
 					activeEl.messageManager.loadFrameScript(script, false);
 				} catch(e) { console.error("[UC]: Ошибка вставки в контент страницы", e); }
-			} 
+			}
 			// Сценарий Б: Фокус находится в ИНТЕРФЕЙСЕ БРАУЗЕРА (URL-строка, поиск и т.д.)
 			else {
 				try {
@@ -161,7 +160,7 @@
 			// Меню
 			let popup = doc.createXULElement("menupopup");
 			popup.id = BUTTON_ID + "-popup";
-			popup.setAttribute("context", ""); 
+			popup.setAttribute("context", "");
 
 			let hbox = doc.createXULElement("hbox");
 			hbox.setAttribute("flex", "1");
@@ -188,14 +187,17 @@
 			// Клик ЛКМ по пункту меню
 			popup.addEventListener("command", (e) => {
 				if (e.target.localName !== "menuitem") return;
-				insertSymbol(e.target.getAttribute("label"));
+				let targetActiveEl = e.target.ownerDocument.activeElement;
+				insertSymbol(e.target.getAttribute("label"), targetActiveEl);
 			});
+
 			 // Клик ПКМ по пункту меню
 			popup.addEventListener("click", (e) => {
 				if (e.button === 2 && e.target.localName === "menuitem") {
 					e.preventDefault();
 					e.stopPropagation();
-					insertSymbol(e.target.getAttribute("label"));
+					let targetActiveEl = e.target.ownerDocument.activeElement;
+					insertSymbol(e.target.getAttribute("label"), targetActiveEl);
 				}
 			});
 			btn.appendChild(popup);
