@@ -1,7 +1,8 @@
 // ==UserScript==
 // @name			Многоцветное автовыделение 
 // @description		Кнопка позволяет "подсветить" на странице несколько слов одновременно разными цветами.
-// @compatibility	Firefox 152 
+// @compatibility	Firefox 152
+// @version			1.1.1 Оптимизация математики отрисовки маркеров.
 // @version			1.1.0 Новый способ инъекции подсветки текста в страницу (теперь подсветка работает даже на сайтах с параноидальными настройками Content Security Policy).
 // @version			1.0.2 Количество "слотов" теперь автоматически вычисляется из количества цветов.
 // @version			1.0.1 Изменён способ вывода иконок в меню кнопки.
@@ -371,15 +372,15 @@ if (!ChromeUtils.domProcessChild.childID) {
 					const winHeight = window.innerHeight;
 					const docHeight = Math.max(document.documentElement.scrollHeight, document.body ? document.body.scrollHeight : 0, winHeight);
 					// Внутреннее разрешение холста = физические пиксели окна монитора
-					canvas.width = Math.round(14 * chromeDPR);
-					const canvasPhysicalHeight = Math.round(winHeight * currentDPR);
+					canvas.width = 14 * chromeDPR;
+					const canvasPhysicalHeight = winHeight * currentDPR;
 					canvas.height = canvasPhysicalHeight;
 
 					let ctx = canvas.getContext('2d');
 					ctx.clearRect(0, 0, canvas.width, canvas.height);
 					// Перевод отступов в физические пиксели экрана.
-					const topOffsetPhysical = Math.round(18 * chromeDPR);
-					const bottomOffsetPhysical = Math.round(15 * chromeDPR);
+					const topOffsetPhysical = 17 * chromeDPR;
+					const bottomOffsetPhysical = 17 * chromeDPR;
 					// Реальная высота зоны для маркеров (в физических пикселях)
 					const trackHeightPhysical = canvasPhysicalHeight - topOffsetPhysical - bottomOffsetPhysical;
 					const rectHeight = Math.max(1, Math.round(3 * chromeDPR)); 
@@ -388,9 +389,7 @@ if (!ChromeUtils.domProcessChild.childID) {
 						// Расчёт чистого процента прокрутки документа (от 0.0 до 1.0)
 						let scrollPercent = marker.y / docHeight;
 						// Расчёт идеального центра маркера на экране
-						let markerCenterY = topOffsetPhysical + (scrollPercent * trackHeightPhysical);
-						// Расчёт половины толщины маркера и ЖЕСТКОЕ округление до целого пикселя
-						let drawY = Math.round(markerCenterY - (rectHeight / 2));
+						let drawY = Math.round(topOffsetPhysical + (scrollPercent * trackHeightPhysical));
 
 						ctx.fillStyle = marker.color;
 						ctx.fillRect(0, drawY, canvas.width, rectHeight); 
