@@ -1,7 +1,8 @@
-﻿// ==UserScript==
+// ==UserScript==
 // @name			Вставка символов Plus
 // @description		Кнопка с меню спецсимволов и текстовых шаблонов с поддержкой буфера обмена.
-// @compatibility	Firefox 152 
+// @compatibility	Firefox 152
+// @version			1.0.1 Исправлена работа скрипта в нескольких окнах браузера.
 // @version			1.0.0 (релиз)
 // @homepage		https://github.com/KotDaVinci-1/FirefoxChromeScripts
 // ==/UserScript==
@@ -80,12 +81,13 @@
 		sss.loadAndRegisterSheet(uri, sss.USER_SHEET);
 	}
 
-	// ЛОГИКА ВСТАВКИ СИМВОЛОВ (теперь принимает сохраненный элемент фокуса)
+	// ЛОГИКА ВСТАВКИ СИМВОЛОВ
 	function insertSymbol(sym, targetEl) {
-		let activeEl = targetEl || document.activeElement;
+		let activeEl = targetEl;
+		if (!activeEl) return;
 
 		// Сценарий А: Фокус находится на ВЕБ-СТРАНИЦЕ (e10s / контент)
-		if (activeEl && activeEl.localName === "browser" && activeEl.isRemoteBrowser) {
+		if (activeEl.localName === "browser" && activeEl.isRemoteBrowser) {
 			try {
 				let fn = function(text) {
 					let el = content.document.activeElement;
@@ -115,7 +117,7 @@
 				let script = `data:application/javascript,${encodeURIComponent(code)}`;
 				activeEl.messageManager.loadFrameScript(script, false);
 			} catch(e) { console.error("[UC]: Ошибка вставки в контент страницы", e); }
-		} 
+		}
 		// Сценарий Б: Фокус находится в ИНТЕРФЕЙСЕ БРАУЗЕРА
 		else {
 			try {
@@ -130,7 +132,7 @@
 						let end = focusedEl.selectionEnd;
 						let val = focusedEl.value;
 						let newVal = val.slice(0, start) + sym + val.slice(end);
-						
+
 						if (typeof focusedEl.setUserInput === "function") {
 							focusedEl.setUserInput(newVal);
 						} else {
@@ -172,7 +174,7 @@
 			btn.addEventListener("click", function(e) {
 				if (e.button === 1) {
 					if (e.target.closest("menupopup")) return; // Игнорируем клики внутри меню
-					
+
 					e.preventDefault();
 					e.stopPropagation();
 					let popup = btn.querySelector("menupopup");
@@ -184,13 +186,13 @@
 			// Меню
 			let popup = doc.createXULElement("menupopup");
 			popup.id = BUTTON_ID + "-popup";
-			popup.setAttribute("context", ""); 
-			
+			popup.setAttribute("context", "");
+
 			let hbox = doc.createXULElement("hbox");
 			hbox.setAttribute("flex", "1");
 			hbox.setAttribute("orient", "horizontal");
 			popup.appendChild(hbox);
-			
+
 			// Генерация сетки
 			columns.forEach(colData => {
 				let menugroup = doc.createXULElement("menugroup");
@@ -211,7 +213,7 @@
 
 					menugroup.appendChild(menuitem);
 				});
-				
+
 				hbox.appendChild(menugroup);
 			});
 
@@ -222,9 +224,9 @@
 
 				let textToInsert = target.getAttribute("value");
 				let currentWin = target.ownerGlobal || target.ownerDocument.defaultView || window;
-				
-				// Захват активного элемента ДО паузы на чтение буфера
-				let savedActiveElement = document.activeElement;
+
+				// Захват активного элемента
+				let savedActiveElement = target.ownerDocument.activeElement;
 
 				// Если есть макрос, читаем буфер
 				if (textToInsert.includes("{CLIPBOARD}")) {
