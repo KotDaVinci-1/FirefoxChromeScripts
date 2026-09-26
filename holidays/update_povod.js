@@ -1,9 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 
-// povod.json создастся в этой же папке (holidays/povod.json)
 const FILE_PATH = path.join(__dirname, 'povod.json');
-// ALERT.txt создастся уровнем выше — в корне репозитория
 const ALERT_PATH = path.join(__dirname, '..', 'ALERT.txt');
 const UPDATE_INTERVAL_DAYS = 25;
 
@@ -14,15 +12,26 @@ function formatDate(date) {
 }
 
 async function run() {
-    // 1. Проверяем свежесть данных
+    // 1. Проверяем свежесть данных, читая метку времени прямо из файла
     if (fs.existsSync(FILE_PATH)) {
-        const stats = fs.statSync(FILE_PATH);
-        const daysSinceUpdate = (Date.now() - stats.mtimeMs) / (1000 * 60 * 60 * 24);
+        let lastUpdateMs = 0;
+        try {
+            const currentData = JSON.parse(fs.readFileSync(FILE_PATH, 'utf8'));
+            if (currentData._meta && currentData._meta[0]) {
+                lastUpdateMs = parseInt(currentData._meta[0]);
+            }
+        } catch (e) {
+            console.log("Не удалось прочитать timestamp из файла, обновляем принудительно.");
+        }
+
+        // Если lastUpdateMs = 0 (нет файла или ключа _meta), daysSinceUpdate будет огромным (с 1970 года)
+        const daysSinceUpdate = (Date.now() - lastUpdateMs) / (1000 * 60 * 60 * 24);
         
         if (daysSinceUpdate < UPDATE_INTERVAL_DAYS && !fs.existsSync(ALERT_PATH)) {
             console.log(`Данные свежие (${daysSinceUpdate.toFixed(1)} дн. назад). Запрос отменен.`);
             return;
         }
+        console.log(`Данные устарели (${daysSinceUpdate.toFixed(1)} дн. назад). Начинаем обновление.`);
     }
 
     // 2. Даты (вчера -> +6 месяцев)
@@ -53,7 +62,7 @@ async function run() {
             data.days.forEach(day => {
                 if (day.holidays && day.holidays.length > 0) {
                     let cleanHolidays = [...new Set(day.holidays.filter(h => 
-                        !h.includes("Выходной")
+                        !h.includes("Выходной") // "каникулы" мы убрали по вашей рекомендации
                     ))];
                     
                     if (cleanHolidays.length > 0) {
@@ -64,7 +73,9 @@ async function run() {
             });
         }
 
-        // 5. Успех
+        // 5. Успех! Записываем текущее время в файл перед сохранением
+        holidaysDict["_meta"] = [Date.now().toString()];
+
         fs.writeFileSync(FILE_PATH, JSON.stringify(holidaysDict, null, 2));
         if (fs.existsSync(ALERT_PATH)) {
             fs.unlinkSync(ALERT_PATH);
