@@ -2,6 +2,7 @@
 // @name			Инфо-пробел
 // @description		Расширяющийся пробел с заголовком и виджетами
 // @compatibility	Firefox 153
+// @version			1.0.3 Для подсказки виджета даты добавлено кэширование данных.
 // @version			1.0.2 Для подсказки виджета даты добавлен альтернативный источник данных.
 // @version			1.0.1 В виджет погоды добавлена всплывающая подсказка с названием города.
 // @version			1.0.0 (релиз)
@@ -394,9 +395,7 @@
 					this._lastGfx.timestamp = now;
 				}
 
-			} catch (e) {
-				console.error("Ошибка обновления CPU/GFX:", e);
-			}
+			} catch (e) { console.error("Ошибка обновления CPU/GFX:", e); }
 		},
 
 		updateDateValue: function() {
@@ -427,9 +426,8 @@
 		// Логика получения и кэширования праздников
 		updatePovodTooltip: async function(dateEl) {
 			const PREF_LAST = "uc.module.date.povod.last_update";
-			const PREF_TEXT = "uc.module.date.povod.tooltip_text";
-			
-			// Массив источников в порядке приоритета: Основной (GitHub) -> Резервный (Google Sheets)
+			const PREF_DATA = "uc.module.date.povod.cached_json"; // Храним сырые данные, а не текст
+
 			const SOURCES = [
 				"https://raw.githubusercontent.com/KotDaVinci-1/FirefoxChromeScripts/main/holidays/povod.json",
 				"https://docs.google.com/spreadsheets/d/1PNqCvPUxSdyyw3zVbemQWE62XfBiHUC7klBt6vuWBvc/export?format=tsv&gid=771050827&range=A:A"
@@ -440,93 +438,84 @@
 			let now = new Date();
 			let todayFull = getDDMM(now) + '.' + now.getFullYear();
 
-			// 1. Читаем кэш из about:config
-			try {
-				let lastUpdate = Services.prefs.getStringPref(PREF_LAST, "");
-				let cachedText = Services.prefs.getStringPref(PREF_TEXT, "");
-
-				if (lastUpdate === todayFull && cachedText) {
-					dateEl.setAttribute("tooltiptext", cachedText);
-					return;
-				}
-			} catch(e) {}
-
-			dateEl.setAttribute("tooltiptext", "Сверяемся с календарем...");
-
-			// 2. Последовательный опрос источников
 			let data = null;
+			let isOfflineCache = false;
+			let lastUpdate = "";
 
-			for (let url of SOURCES) {
-				try {
-					let response = await fetch(url, { cache: "no-store" });
-					if (!response.ok) throw new Error("HTTP " + response.status);
-					
-					let text = await response.text();
-					data = JSON.parse(text);
-					
-					// Если распарсили успешно — выходим из цикла каскада
-					break; 
-				} catch (e) { console.warn(`uc_dynamic_spring: Источник недоступен (${url}):`, e.message); }
-			}
+			try { lastUpdate = Services.prefs.getStringPref(PREF_LAST, ""); } catch(e) {}
 
-			// 3. Обработка полученных данных
-			try {
-				// Если ни один из источников в цикле не отдал валидный JSON
-				if (!data) throw new Error("Все источники данных недоступны");
+			// 1. Сетевой запрос нужен только если сегодня еще не обновляли
+			if (lastUpdate !== todayFull) {
+				dateEl.setAttribute("tooltiptext", "Сверяемся с календарем...");
 
-				let todayDDMM = getDDMM(now);
-				let tomorrow = new Date(now);
-				tomorrow.setDate(tomorrow.getDate() + 1);
-				let tomorrowDDMM = getDDMM(tomorrow);
+				for (let url of SOURCES) {
+					try {
+						let response = await fetch(url, { cache: "no-store" });
+						if (!response.ok) throw new Error("HTTP " + response.status);
 
-				let todayHolidays = data[todayDDMM];
-				let tomorrowHolidays = data[tomorrowDDMM];
-				let tooltipText = "";
-
-				if (todayHolidays || tomorrowHolidays) {
-					let parts = [];
-					if (todayHolidays) {
-						parts.push("Праздник(и) сегодня:\n" + todayHolidays.join("\n"));
-					}
-					if (tomorrowHolidays) {
-						parts.push("Праздник(и) завтра:\n" + tomorrowHolidays.join("\n"));
-					}
-					tooltipText = parts.join("\n\n");
-				} else {
-					let nextDate = new Date(now);
-					let found = false;
-					for (let i = 2; i <= 200; i++) {
-						nextDate.setDate(nextDate.getDate() + 1);
-						let nextDDMM = getDDMM(nextDate);
-
-						if (data[nextDDMM]) {
-							tooltipText = `Ближайший праздник (${nextDDMM}):\n` + data[nextDDMM].join("\n");
-							found = true;
-							break;
-						}
-					}
-					if (!found) tooltipText = "Нет предстоящих праздников в базе.";
+						data = JSON.parse(await response.text());
+						// Сохраняем свежий JSON и дату в кэш
+						Services.prefs.setStringPref(PREF_DATA, JSON.stringify(data));
+						Services.prefs.setStringPref(PREF_LAST, todayFull);
+						break; // Выходим из цикла при успехе
+					} catch (e) { console.warn(`uc_dynamic_spring: Источник недоступен (${url})`); }
 				}
-
-				// Сохраняем данные в about:config
-				Services.prefs.setStringPref(PREF_LAST, todayFull);
-				Services.prefs.setStringPref(PREF_TEXT, tooltipText);
-
-				dateEl.setAttribute("tooltiptext", tooltipText);
-
-			} catch (err) {
-				console.error("uc_dynamic_spring: Ошибка обновления праздников", err);
-
-				// Если и сеть упала, и Google Sheets не ответил — берем старый кэш
-				try {
-					let cachedText = Services.prefs.getStringPref(PREF_TEXT, "");
-					if (cachedText) {
-						dateEl.setAttribute("tooltiptext", cachedText + "\n\n[Нет сети. Данные устарели]");
-					} else {
-						dateEl.setAttribute("tooltiptext", "Не удалось загрузить праздники");
-					}
-				} catch(e) {}
 			}
+
+			// 2. Читаем из кэша, если сеть упала ИЛИ если сегодня уже скачивали данные
+			if (!data) {
+				try {
+					let cachedStr = Services.prefs.getStringPref(PREF_DATA, "");
+					if (cachedStr) {
+						data = JSON.parse(cachedStr);
+						// Если данные есть, но дата обновления не сегодняшняя — значит сеть лежит
+						if (lastUpdate !== todayFull) isOfflineCache = true;
+					}
+				} catch(e) { console.error("uc_dynamic_spring: Ошибка чтения кэша", e); }
+			}
+
+			// 3. Формируем текст на лету (баг с зависшим "Сегодня" исключен)
+			if (!data) {
+				dateEl.setAttribute("tooltiptext", "Не удалось загрузить праздники");
+				return;
+			}
+
+			let todayDDMM = getDDMM(now);
+			let tomorrow = new Date(now);
+			tomorrow.setDate(tomorrow.getDate() + 1);
+			let tomorrowDDMM = getDDMM(tomorrow);
+
+			let todayHolidays = data[todayDDMM];
+			let tomorrowHolidays = data[tomorrowDDMM];
+			let tooltipText = "";
+
+			if (todayHolidays || tomorrowHolidays) {
+				let parts = [];
+				if (todayHolidays) parts.push("Праздник(и) сегодня:\n" + todayHolidays.join("\n"));
+				if (tomorrowHolidays) parts.push("Праздник(и) завтра:\n" + tomorrowHolidays.join("\n"));
+				tooltipText = parts.join("\n\n");
+			} else {
+				let nextDate = new Date(now);
+				let found = false;
+				for (let i = 2; i <= 200; i++) {
+					nextDate.setDate(nextDate.getDate() + 1);
+					let nextDDMM = getDDMM(nextDate);
+
+					if (data[nextDDMM]) {
+						tooltipText = `Ближайший праздник (${nextDDMM}):\n` + data[nextDDMM].join("\n");
+						found = true;
+						break;
+					}
+				}
+				if (!found) tooltipText = "Нет предстоящих праздников в базе.";
+			}
+
+			// Маркер для понимания, что работает резерв
+			if (isOfflineCache) {
+				tooltipText += "\n\n[Нет сети. Используется кэш]";
+			}
+
+			dateEl.setAttribute("tooltiptext", tooltipText);
 		},
 
 		startMemoryPolling: function() {
