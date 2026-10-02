@@ -1,7 +1,8 @@
 // ==UserScript==
-// @name			Многоцветное автовыделение 
+// @name			Многоцветное автовыделение
 // @description		Кнопка позволяет "подсветить" на странице несколько слов одновременно разными цветами.
 // @compatibility	Firefox 152
+// @version			1.1.2 Устранена ошибка при отключении скрипта на активных вкладках с адресами `chrome:` и `about:`.
 // @version			1.1.1 Оптимизация математики отрисовки маркеров.
 // @version			1.1.0 Новый способ инъекции подсветки текста в страницу (теперь подсветка работает даже на сайтах с параноидальными настройками Content Security Policy).
 // @version			1.0.2 Количество "слотов" теперь автоматически вычисляется из количества цветов.
@@ -121,7 +122,7 @@ if (!ChromeUtils.domProcessChild.childID) {
 		if (!rawText || rawText.trim() === "") return false;
 
 		let rawTrimmed = rawText.trim();
-		let wasTruncated = rawTrimmed.includes('\n'); 
+		let wasTruncated = rawTrimmed.includes('\n');
 		let textToSave = rawTrimmed.split(/\r?\n/)[0].trim();
 
 		if (textToSave.length > MAX_LENGTH) {
@@ -228,8 +229,8 @@ if (!ChromeUtils.domProcessChild.childID) {
 
 			let initialIndex = 1;
 			try { initialIndex = Services.prefs.getIntPref(PREF_PREFIX + "index"); } catch(e){}
-			badge.setAttribute("value", initialIndex); 
-			badge.textContent = initialIndex; 
+			badge.setAttribute("value", initialIndex);
+			badge.textContent = initialIndex;
 
 			let initialColor = COLORS[initialIndex - 1] || "gray";
 			badge.style.setProperty("--active-slot-color", initialColor);
@@ -246,7 +247,7 @@ if (!ChromeUtils.domProcessChild.childID) {
 			// --- ИНЖЕКТИРУЕМЫЕ СКРИПТЫ ---
 			const highlightScript = function(args) {
 				if (!window.CSS || !CSS.highlights) return;
-				
+
 				const highlightsArray = args.highlights;
 				const matchCase = args.matchCase;
 				const matchDiacritics = args.matchDiacritics;
@@ -264,13 +265,13 @@ if (!ChromeUtils.domProcessChild.childID) {
 				};
 
 				const getOrigOffset = (origStr, targetFlatOffset) => {
-					if (matchDiacritics && matchCase) return targetFlatOffset; 
+					if (matchDiacritics && matchCase) return targetFlatOffset;
 					let flatIndex = 0;
 					let origIndex = 0;
 					for (let char of origStr) {
 						if (flatIndex >= targetFlatOffset) break;
 						flatIndex += flatten(char).length;
-						origIndex += char.length; 
+						origIndex += char.length;
 					}
 					return origIndex;
 				};
@@ -283,15 +284,15 @@ if (!ChromeUtils.domProcessChild.childID) {
 				while ((n = walker.nextNode())) {
 					const p = n.parentNode;
 					if (p && p.nodeName.match(/^(SCRIPT|STYLE|NOSCRIPT|TEXTAREA)$/i)) continue;
-					
+
 					let origStr = n.nodeValue;
 					let flatStr = flatten(origStr);
-					
-					nodes.push({ 
-						node: n, 
-						start: text.length, 
+
+					nodes.push({
+						node: n,
+						start: text.length,
 						end: text.length + flatStr.length,
-						origText: origStr 
+						origText: origStr
 					});
 					text += flatStr;
 				}
@@ -302,7 +303,7 @@ if (!ChromeUtils.domProcessChild.childID) {
 				highlightsArray.forEach((item) => {
 					let searchStr = flatten(item.text);
 					if (!searchStr) return;
-					
+
 					let matchIdx = -1;
 					let startIndex = 0;
 					let ranges = [];
@@ -383,7 +384,7 @@ if (!ChromeUtils.domProcessChild.childID) {
 					const bottomOffsetPhysical = 17 * chromeDPR;
 					// Реальная высота зоны для маркеров (в физических пикселях)
 					const trackHeightPhysical = canvasPhysicalHeight - topOffsetPhysical - bottomOffsetPhysical;
-					const rectHeight = Math.max(1, Math.round(3 * chromeDPR)); 
+					const rectHeight = Math.max(1, Math.round(3 * chromeDPR));
 
 					markers.forEach(marker => {
 						// Расчёт чистого процента прокрутки документа (от 0.0 до 1.0)
@@ -392,7 +393,7 @@ if (!ChromeUtils.domProcessChild.childID) {
 						let drawY = Math.round(topOffsetPhysical + (scrollPercent * trackHeightPhysical));
 
 						ctx.fillStyle = marker.color;
-						ctx.fillRect(0, drawY, canvas.width, rectHeight); 
+						ctx.fillRect(0, drawY, canvas.width, rectHeight);
 					});
 				};
 
@@ -404,7 +405,7 @@ if (!ChromeUtils.domProcessChild.childID) {
 
 				if (allMarkers.length > 0 && hasVerticalScrollbar) {
 					drawCanvasMarkers(allMarkers);
-					window._ucHighlightSavedRanges = savedRanges; 
+					window._ucHighlightSavedRanges = savedRanges;
 
 					if (!window._ucHighlightResizeBound) {
 						let resizeTimeout;
@@ -466,9 +467,9 @@ if (!ChromeUtils.domProcessChild.childID) {
 				try { matchCase = Services.prefs.getBoolPref(PREF_PREFIX + "matchCase"); } catch(e){}
 				try { matchDiacritics = Services.prefs.getBoolPref(PREF_PREFIX + "matchDiacritics"); } catch(e){}
 
-				let args = { 
-					highlights: currentHighlights, 
-					matchCase: matchCase, 
+				let args = {
+					highlights: currentHighlights,
+					matchCase: matchCase,
 					matchDiacritics: matchDiacritics,
 					chromeDPR: win.devicePixelRatio, // Эталонный масштаб системы
 					slotCount: COLORS.length // кол-во цветов = кол-во слотов
@@ -477,8 +478,8 @@ if (!ChromeUtils.domProcessChild.childID) {
 				let codeToInject = `(${highlightScript.toString()})(${JSON.stringify(args)});`;
 
 				try {
-					win.gBrowser.fixupAndLoadURIString("javascript:" + encodeURIComponent(codeToInject), { 
-						triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal() 
+					win.gBrowser.fixupAndLoadURIString("javascript:" + encodeURIComponent(codeToInject), {
+						triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal()
 					});
 				} catch(e) {
 				}
@@ -508,7 +509,7 @@ if (!ChromeUtils.domProcessChild.childID) {
 
 			// --- ЛОГИКА КНОПКИ ---
 			btn.addEventListener("click", async (e) => {
-				if (e.target.closest("menupopup")) return; 
+				if (e.target.closest("menupopup")) return;
 				if (!win.gBrowser) return;
 
 				const isActive = btn.getAttribute("data-highlighted") === "true";
@@ -520,8 +521,8 @@ if (!ChromeUtils.domProcessChild.childID) {
 						win.gBrowser.removeTabsProgressListener(progressListener);
 
 						let codeToInject = `(${clearScript.toString()})();`;
-						win.gBrowser.fixupAndLoadURIString("javascript:" + encodeURIComponent(codeToInject), { 
-							triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal() 
+						win.gBrowser.fixupAndLoadURIString("javascript:" + encodeURIComponent(codeToInject), {
+							triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal()
 						});
 
 						let frameScriptCode = `
@@ -544,7 +545,7 @@ if (!ChromeUtils.domProcessChild.childID) {
 
 						for (let tab of allTabs) {
 							if (tab !== currentTab && !tab.hasAttribute("pending")) {
-								try { tab.linkedBrowser.messageManager.loadFrameScript(scriptURI, false); } 
+								try { tab.linkedBrowser.messageManager.loadFrameScript(scriptURI, false); }
 								catch (err) {}
 							}
 						}
@@ -566,7 +567,7 @@ if (!ChromeUtils.domProcessChild.childID) {
 							let mm = browser.messageManager;
 							let msgName = "UC-Highlighter:GetSelection-" + Date.now();
 							let listener = (msg) => {
-								mm.removeMessageListener(msgName, listener); 
+								mm.removeMessageListener(msgName, listener);
 								resolve(msg.data);
 							};
 							mm.addMessageListener(msgName, listener);
@@ -601,7 +602,7 @@ if (!ChromeUtils.domProcessChild.childID) {
 				let item = doc.createXULElement("menuitem");
 				item.setAttribute("type", "checkbox");
 				item.setAttribute("label", label);
-				item.setAttribute("closemenu", "none"); 
+				item.setAttribute("closemenu", "none");
 				item.setAttribute("image", "data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnLz4=");
 
 				let isChecked = false;
@@ -619,14 +620,14 @@ if (!ChromeUtils.domProcessChild.childID) {
 					item.toggleAttribute("checked", newState);
 					// Если нужна реакция в интерфейсе:
 					if (btn.getAttribute("data-highlighted") === "true") {
-						injectHighlightToActiveTab(); 
+						injectHighlightToActiveTab();
 					}
 				});
 				return item;
 			};
 
 			btn.addEventListener("contextmenu", (e) => {
-				if (e.target.closest("menupopup")) return; 
+				if (e.target.closest("menupopup")) return;
 
 				e.preventDefault();
 				e.stopPropagation();
@@ -642,7 +643,7 @@ if (!ChromeUtils.domProcessChild.childID) {
 
 					let item = doc.createXULElement("menuitem");
 					item.setAttribute("class", "menuitem-iconic");
-					item.setAttribute("data-slot", i); 
+					item.setAttribute("data-slot", i);
 					// Передаем цвет в CSS:
 					item.style.setProperty("--slot-color", COLORS[i-1]);
 					// Помечаем активный слот:
@@ -665,8 +666,8 @@ if (!ChromeUtils.domProcessChild.childID) {
 							let input = { value: currentText };
 							let checkState = { value: false };
 							let result = Services.prompt.prompt(
-								win, "Многоцветное автовыделение", 
-								`Введите текст для слота ${i}\n(оставьте пустым для очистки):`, 
+								win, "Многоцветное автовыделение",
+								`Введите текст для слота ${i}\n(оставьте пустым для очистки):`,
 								input, null, checkState
 							);
 
@@ -681,7 +682,7 @@ if (!ChromeUtils.domProcessChild.childID) {
 									injectHighlightToActiveTab();
 								}
 							}
-						} 
+						}
 						else if (e.button === 1) {
 							popup.hidePopup();
 							if (currentText) {
@@ -731,9 +732,9 @@ if (!ChromeUtils.domProcessChild.childID) {
 				let currentIndex = 1;
 				try { currentIndex = Services.prefs.getIntPref(PREF_PREFIX + "index"); } catch(ex){}
 				if (e.deltaY > 0) {
-					currentIndex = (currentIndex >= COLORS.length) ? 1 : currentIndex + 1; 
+					currentIndex = (currentIndex >= COLORS.length) ? 1 : currentIndex + 1;
 				} else {
-					currentIndex = (currentIndex <= 1) ? COLORS.length : currentIndex - 1; 
+					currentIndex = (currentIndex <= 1) ? COLORS.length : currentIndex - 1;
 				}
 				Services.prefs.setIntPref(PREF_PREFIX + "index", currentIndex);
 				updateBadge();
