@@ -2,6 +2,7 @@
 // @name			Инфо-пробел
 // @description		Расширяющийся пробел с заголовком и виджетами
 // @compatibility	Firefox 153
+// @version			1.0.4 Фикс потери данных о погоде браузером.
 // @version			1.0.3 Для подсказки виджета даты добавлено кэширование данных.
 // @version			1.0.2 Для подсказки виджета даты добавлен альтернативный источник данных.
 // @version			1.0.1 В виджет погоды добавлена всплывающая подсказка с названием города.
@@ -304,14 +305,12 @@
 					weatherBox.removeAttribute("tooltiptext");
 				}
 
-				// Извлекаем только базовую температуру и ID иконки
-				if (data?.weather?.suggestions?.[0]?.current_conditions) {
-					const conditions = data.weather.suggestions[0].current_conditions;
+				// Берем данные. Если suggestions пуст ([]), то conditions будет undefined
+				const conditions = data?.weather?.suggestions?.[0]?.current_conditions;
 
-					if (conditions.temperature?.c !== undefined) {
-						let currentTemp = conditions.temperature.c;
-						tempEl.setAttribute("value", `${currentTemp > 0 ? "+" + currentTemp : currentTemp}°C`);
-					}
+				if (conditions && conditions.temperature?.c !== undefined) {
+					let currentTemp = conditions.temperature.c;
+					tempEl.setAttribute("value", `${currentTemp > 0 ? "+" + currentTemp : currentTemp}°C`);
 
 					const iconId = conditions.icon_id;
 					if (iconId && CONFIG.modules.WICONS) {
@@ -321,6 +320,10 @@
 						iconEl.setAttribute("class", "weather-icon");
 						iconEl.style.display = "none";
 					}
+				} else {
+					tempEl.setAttribute("value", "--°C");
+					iconEl.setAttribute("class", "weather-icon");
+					iconEl.style.display = "none";
 				}
 			} catch (e) {}
 		},
