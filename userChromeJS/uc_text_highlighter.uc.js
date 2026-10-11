@@ -2,6 +2,7 @@
 // @name			Многоцветное автовыделение
 // @description		Кнопка позволяет "подсветить" на странице несколько слов одновременно разными цветами.
 // @compatibility	Firefox 152
+// @version			1.1.3 Патч виджета под интерфейс Nova.
 // @version			1.1.2 Устранена ошибка при отключении скрипта на активных вкладках с адресами `chrome:` и `about:`.
 // @version			1.1.1 Оптимизация математики отрисовки маркеров.
 // @version			1.1.0 Новый способ инъекции подсветки текста в страницу (теперь подсветка работает даже на сайтах с параноидальными настройками Content Security Policy).
@@ -185,6 +186,7 @@ if (!ChromeUtils.domProcessChild.childID) {
 						margin-inline-end: -5px !important;
 						margin-top: -5px !important;
 						min-width: 9px !important;
+						border-radius: 2px !important;
 					}
 
 					#uc_text_highlighter[data-highlighted="true"] .toolbarbutton-icon {
