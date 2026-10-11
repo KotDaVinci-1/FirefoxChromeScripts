@@ -2,7 +2,7 @@
 // @name			Инфо-пробел
 // @description		Расширяющийся пробел с заголовком и виджетами
 // @compatibility	Firefox 153
-// @version			1.0.5 Исправлена работа в нескольких окнах браузера (виджет и опрос данных теперь корректно привязаны к каждому окну).
+// @version			1.1.0 Рефакторинг. Исправлена работа в нескольких окнах браузера.
 // @version			1.0.4 Фикс потери данных о погоде браузером.
 // @version			1.0.3 Для подсказки виджета даты добавлено кэширование данных.
 // @version			1.0.2 Для подсказки виджета даты добавлен альтернативный источник данных.
@@ -115,7 +115,7 @@
 		`
 	};
 
-	// Стили и pref'ы — не завязаны на CustomizableUI, применяются в каждом окне независимо, это нормально
+	// Стили и pref'ы — не завязаны на CustomizableUI, применяются в каждом окне независимо
 	let finalCSS = CONFIG.stylesBase;
 	if (CONFIG.modules.WICONS) { finalCSS += CONFIG.stylesFF; }
 	let cssEl = document.createElementNS("http://www.w3.org/1999/xhtml", "style");
@@ -128,16 +128,9 @@
 		} catch (e) {}
 	}
 
-	// --- Регистрация виджета: ТОЛЬКО ОДИН РАЗ за всю сессию браузера ---
-	// CustomizableUI — общий на весь процесс сервис. Если вызывать createWidget
-	// из каждого окна повторно (а .uc.js грузится в каждое окно заново), второй
-	// вызов ломает внутреннее состояние CustomizableUI (см. TypeError в консоли).
-	// Дальше сам CustomizableUI вызовет onBuild(aDocument) для каждого текущего
-	// и будущего окна — этого достаточно.
+	// --- Регистрация виджета: один раз за всю сессию браузера ---
+
 	if (!CustomizableUI.getWidget(WIDGET_ID)) {
-		// Здесь и ниже, ВНУТРИ onBuild, нельзя использовать голые window/document —
-		// эта функция создаётся один раз и «помнит» окно, в котором была создана.
-		// Всё окно-зависимое берём из aDocument.defaultView (win).
 		const perWindowCleanup = new WeakMap();
 
 		CustomizableUI.createWidget({
@@ -379,7 +372,7 @@
 						} catch (e) {}
 					};
 
-					track(win.setTimeout(updateWeatherValue, 5000));
+					track(win.setTimeout(updateWeatherValue, 5100));
 					track(win.setInterval(updateWeatherValue, 180000));
 				}
 
