@@ -2,6 +2,7 @@
 // @name			Инфо-пробел
 // @description		Расширяющийся пробел с заголовком и виджетами
 // @compatibility	Firefox 153
+// @version			1.1.1 Рефакторинг. Исправлен некорректный шрифт на "родных" панелях браузера при загрузке браузера для загрузчика UCF.
 // @version			1.1.0 Рефакторинг. Исправлена работа в нескольких окнах браузера.
 // @version			1.0.4 Фикс потери данных о погоде браузером.
 // @version			1.0.3 Для подсказки виджета даты добавлено кэширование данных.
@@ -13,9 +14,6 @@
 
 (function() {
 	if (window.UCDynamicSpring) return;
-	window.UCDynamicSpring = true; // просто флаг «скрипт уже загружен в этом окне»
-
-	const WIDGET_ID = "uc_dynamic_spring";
 
 	// --- БЛОК КОНФИГУРАЦИИ ---
 	const CONFIG = {
@@ -27,7 +25,7 @@
 			DATEW: 2,		// 0 - Откл; 1 - Слева;  2 - Справа		(дата)
 			BASIS: 2,		// 0 - Только виджеты;	 1 - Виджеты и расширяющийся пробел;   2 - заголовок страницы на расширяющемся пробеле
 			WICONS: true,	// Иконка погоды
-			POVOD: true		// Всплывающая подсказка с праздниками для модуля "дата" 
+			POVOD: true		// Всплывающая подсказка с праздниками для модуля "дата"
 		},
 
 		stylesBase: `
@@ -58,7 +56,6 @@
 				-moz-context-properties: fill;
 				min-height: 42px;
 			}
-			/* Прячем все реальные внутренности виджета (погоду, память и т.д.), чтобы они не перекрывали иконку */
 			#main-window[customizing] #customization-content-container #uc_dynamic_spring > * { display: none !important; }
 
 			/*заголовок страницы*/
@@ -67,7 +64,6 @@
 				text-align: center;
 				font-size: 18px;
 				font-weight: 600;
-				color: #0ff;
 				color: light-dark(#00F, #0FF);
 				margin: 0 6px;
 				transform: translateY(-2px);
@@ -80,14 +76,12 @@
 			#uc-dynamic-left,
 			#uc-dynamic-right { height: calc(100% - 2px); max-height: 28px; }
 			#uc-dynamic-right { margin-left: auto; }
-
 			`,
 
-			stylesFF: `
+		stylesFF: `
 			#uc_dynamic_spring .weather-widget .weather-icon { height: 22px; width: 22px; scale: 1.2; margin-right: 6px; display: none; }
 			#uc-module-weather.uc-module.weather-widget #uc-module-weather-temp { justify-content: flex-end !important; }
 
-			/* --- СКОПИРОВАННЫЕ ПРАВИЛА ИКОНОК FIREFOX --- */
 			#uc_dynamic_spring .weather-widget .weather-icon.iconId1 { content: url("chrome://browser/skin/weather/sunny.svg"); scale: 0.94; }
 			#uc_dynamic_spring .weather-widget .weather-icon.iconId2 { content: url("chrome://browser/skin/weather/mostly-sunny.svg"); scale: 1.4; }
 			#uc_dynamic_spring .weather-widget .weather-icon:is(.iconId3, .iconId4, .iconId6) { content: url("chrome://browser/skin/weather/partly-sunny.svg"); scale: 1.28; bottom: -1px; position: relative; }
@@ -115,410 +109,447 @@
 		`
 	};
 
-	// Стили и pref'ы — не завязаны на CustomizableUI, применяются в каждом окне независимо
-	let finalCSS = CONFIG.stylesBase;
-	if (CONFIG.modules.WICONS) { finalCSS += CONFIG.stylesFF; }
-	let cssEl = document.createElementNS("http://www.w3.org/1999/xhtml", "style");
-	cssEl.textContent = finalCSS;
-	document.head.appendChild(cssEl);
+	window.UCDynamicSpring = {
+		init: function() {
+			// Применяем стили в документах открытых окон
+			let finalCSS = CONFIG.stylesBase;
+			if (CONFIG.modules.WICONS) { finalCSS += CONFIG.stylesFF; }
 
-	if (CONFIG.modules.WEATHER > 0) {
-		try {
-			Services.prefs.setBoolPref("browser.newtabpage.activity-stream.system.showWeather", true);
-		} catch (e) {}
-	}
+			let css = document.createElementNS("http://www.w3.org/1999/xhtml", "style");
+			css.textContent = finalCSS;
+			document.head.appendChild(css);
 
-	// --- Регистрация виджета: один раз за всю сессию браузера ---
+			if (CONFIG.modules.WEATHER > 0) {
+				try {
+					Services.prefs.setBoolPref("browser.newtabpage.activity-stream.system.showWeather", true);
+				} catch (e) {}
+			}
 
-	if (!CustomizableUI.getWidget(WIDGET_ID)) {
-		const perWindowCleanup = new WeakMap();
+			CustomizableUI.createWidget({
+				id: "uc_dynamic_spring",
+				type: "custom",
 
-		CustomizableUI.createWidget({
-			id: WIDGET_ID,
-			type: "custom",
+				onBuild: function(aDocument) {
+					let win = aDocument.defaultView;
+					let spring = aDocument.createXULElement(CONFIG.modules.BASIS > 0 ? "toolbarspring" : "toolbaritem");
+					spring.id = "uc_dynamic_spring";
+					spring.className = "customizableui-space";
+					spring.setAttribute("label", "Инфо-пробел");
 
-			onBuild: function(aDocument) {
-				const win = aDocument.defaultView;
-				const timers = [];
-				const cleanups = [];
-				const track = (id) => { timers.push(id); return id; };
+					let leftBox = aDocument.createXULElement("hbox");
+					leftBox.id = "uc-dynamic-left";
 
-				let spring = aDocument.createXULElement(CONFIG.modules.BASIS > 0 ? "toolbarspring" : "toolbaritem");
-				spring.id = WIDGET_ID;
-				spring.className = "customizableui-space";
-				spring.setAttribute("label", "Инфо-пробел");
+					let rightBox = aDocument.createXULElement("hbox");
+					rightBox.id = "uc-dynamic-right";
 
-				let leftBox = aDocument.createXULElement("hbox");
-				leftBox.id = "uc-dynamic-left";
+					spring.appendChild(leftBox);
 
-				let rightBox = aDocument.createXULElement("hbox");
-				rightBox.id = "uc-dynamic-right";
-
-				spring.appendChild(leftBox);
-
-				let titleLabel = null;
-				if (CONFIG.modules.BASIS === 2) {
-					titleLabel = aDocument.createXULElement("label");
-					titleLabel.id = "uc-dynamic-title";
-					titleLabel.setAttribute("crop", "end");
-					titleLabel.setAttribute("value", "Загрузка...");
-					spring.appendChild(titleLabel);
-				}
-
-				spring.appendChild(rightBox);
-
-				// --- Заголовок вкладки ---
-				if (titleLabel && win.gBrowser) {
-					const updateTitleValue = () => {
-						if (win.gBrowser.selectedTab) {
-							titleLabel.setAttribute("value", win.gBrowser.selectedTab.label || "");
-						}
-					};
-					const onTabSelectTitle = () => updateTitleValue();
-					const onTabAttrModified = (event) => {
-						if (event.detail.changed.includes("label") && event.target === win.gBrowser.selectedTab) {
-							updateTitleValue();
-						}
-					};
-					const progressListener = {
-						onLocationChange(aBrowser) {
-							if (aBrowser === win.gBrowser.selectedBrowser) updateTitleValue();
-						}
-					};
-					win.gBrowser.tabContainer.addEventListener("TabSelect", onTabSelectTitle);
-					win.gBrowser.tabContainer.addEventListener("TabAttrModified", onTabAttrModified);
-					win.gBrowser.addTabsProgressListener(progressListener);
-					cleanups.push(() => {
-						win.gBrowser.tabContainer.removeEventListener("TabSelect", onTabSelectTitle);
-						win.gBrowser.tabContainer.removeEventListener("TabAttrModified", onTabAttrModified);
-						win.gBrowser.removeTabsProgressListener(progressListener);
-					});
-					track(win.setTimeout(updateTitleValue, 500));
-				}
-
-				// --- Модуль: Память ---
-				if (CONFIG.modules.MEMORY > 0) {
-					let memLabel = aDocument.createXULElement("label");
-					memLabel.id = "uc-module-memory";
-					memLabel.className = "uc-module";
-					memLabel.setAttribute("value", "Mem: -- MB");
-					(CONFIG.modules.MEMORY === 1 ? leftBox : rightBox).appendChild(memLabel);
-
-					const updateMemoryValue = async () => {
-						if (!win.gBrowser || !win.gBrowser.selectedBrowser) return;
-						try {
-							const procInfo = await ChromeUtils.requestProcInfo();
-							const outerWindowId = win.gBrowser.selectedBrowser.outerWindowID;
-							let memory = '--';
-							for (const childProc of procInfo.children) {
-								if (childProc.windows) {
-									for (const w of childProc.windows) {
-										if (w.outerWindowId === outerWindowId) {
-											memory = String(Math.round(childProc.memory / (1024 * 1024))).padStart(4, '\u2007');
-											break;
-										}
-									}
-								}
-							}
-							memLabel.setAttribute("value", `Mem: ${memory} MB`);
-						} catch (e) { console.error("uc_dynamic_spring: ошибка модуля памяти", e); }
-					};
-
-					updateMemoryValue();
-					track(win.setInterval(updateMemoryValue, 3000));
-					if (win.gBrowser) {
-						win.gBrowser.tabContainer.addEventListener("TabSelect", updateMemoryValue);
-						cleanups.push(() => win.gBrowser.tabContainer.removeEventListener("TabSelect", updateMemoryValue));
+					if (CONFIG.modules.BASIS === 2) {
+						let titleLabel = aDocument.createXULElement("label");
+						titleLabel.id = "uc-dynamic-title";
+						titleLabel.setAttribute("crop", "end");
+						titleLabel.setAttribute("value", "Загрузка...");
+						spring.appendChild(titleLabel);
 					}
-				}
 
-				// --- Модули: CPU / GFX (общий опрос процессов) ---
-				if (CONFIG.modules.CPU > 0 || CONFIG.modules.GFX > 0) {
-					let cpuEl = null, gfxEl = null;
+					spring.appendChild(rightBox);
 
+					// --- Модуль: Память ---
+					if (CONFIG.modules.MEMORY > 0) {
+						let memLabel = aDocument.createXULElement("label");
+						memLabel.id = "uc-module-memory";
+						memLabel.className = "uc-module";
+						memLabel.setAttribute("value", "Mem: -- MB");
+
+						if (CONFIG.modules.MEMORY === 1) leftBox.appendChild(memLabel);
+						else if (CONFIG.modules.MEMORY === 2) rightBox.appendChild(memLabel);
+
+						this.startMemoryPolling(win);
+					}
+
+					// --- Модуль: CPU ---
 					if (CONFIG.modules.CPU > 0) {
-						cpuEl = aDocument.createXULElement("label");
-						cpuEl.id = "uc-module-cpu";
-						cpuEl.className = "uc-module";
-						cpuEl.setAttribute("value", "CPU: \u2007\u2007--%");
-						(CONFIG.modules.CPU === 1 ? leftBox : rightBox).appendChild(cpuEl);
+						let cpuLabel = aDocument.createXULElement("label");
+						cpuLabel.id = "uc-module-cpu";
+						cpuLabel.className = "uc-module";
+						cpuLabel.setAttribute("value", "CPU: \u2007\u2007--%");
+
+						if (CONFIG.modules.CPU === 1) leftBox.appendChild(cpuLabel);
+						else if (CONFIG.modules.CPU === 2) rightBox.appendChild(cpuLabel);
 					}
 
+					// --- Модуль: GFX ---
 					if (CONFIG.modules.GFX > 0) {
-						gfxEl = aDocument.createXULElement("label");
-						gfxEl.id = "uc-module-gfx";
-						gfxEl.className = "uc-module";
-						gfxEl.setAttribute("value", "GFX: \u2007\u2007--%");
-						(CONFIG.modules.GFX === 1 ? leftBox : rightBox).appendChild(gfxEl);
+						let gfxLabel = aDocument.createXULElement("label");
+						gfxLabel.id = "uc-module-gfx";
+						gfxLabel.className = "uc-module";
+						gfxLabel.setAttribute("value", "GFX: \u2007\u2007--%");
+
+						if (CONFIG.modules.GFX === 1) leftBox.appendChild(gfxLabel);
+						else if (CONFIG.modules.GFX === 2) rightBox.appendChild(gfxLabel);
 					}
 
-					let lastCpu = { pid: null, cpuTime: 0, timestamp: 0 };
-					let lastGfx = { cpuTime: 0, timestamp: 0 };
-
-					const formatCpuPercent = (cpuDelta, timeDelta) => {
-						if (timeDelta <= 0 || cpuDelta < 0) return null;
-						const cores = win.navigator.hardwareConcurrency || 1;
-						return String((cpuDelta / (timeDelta * 10000) / cores).toFixed(1)).padStart(4, '\u2007');
-					};
-
-					const updateModules = async (isTabSelect = false) => {
-						if (!cpuEl && !gfxEl) return;
-						try {
-							const procInfo = await ChromeUtils.requestProcInfo();
-							const now = Date.now();
-							const outerWindowId = win.gBrowser?.selectedBrowser?.outerWindowID;
-
-							let currentTabCpuTime = 0;
-							let currentTabPid = null;
-							let totalGfxCpuTime = 0;
-
-							for (const childProc of procInfo.children) {
-								if (gfxEl && !isTabSelect && (childProc.type === 'gpu' || childProc.type === 'rdd' || childProc.type === 'utility')) {
-									totalGfxCpuTime += childProc.cpuTime;
-								}
-								if (cpuEl && outerWindowId && childProc.windows) {
-									for (const w of childProc.windows) {
-										if (w.outerWindowId === outerWindowId) {
-											currentTabCpuTime = childProc.cpuTime;
-											currentTabPid = childProc.pid;
-										}
-									}
-								}
-							}
-
-							if (cpuEl && currentTabPid) {
-								if (lastCpu.pid !== currentTabPid) {
-									lastCpu = { pid: currentTabPid, cpuTime: currentTabCpuTime, timestamp: now };
-									cpuEl.setAttribute("value", `CPU: \u2007\u2007--%`);
-								} else if (lastCpu.timestamp > 0) {
-									const formatted = formatCpuPercent(currentTabCpuTime - lastCpu.cpuTime, now - lastCpu.timestamp);
-									if (formatted) cpuEl.setAttribute("value", `CPU: ${formatted}%`);
-									lastCpu.cpuTime = currentTabCpuTime;
-									lastCpu.timestamp = now;
-								}
-							}
-
-							if (gfxEl && !isTabSelect) {
-								if (lastGfx.timestamp > 0) {
-									const formatted = formatCpuPercent(totalGfxCpuTime - lastGfx.cpuTime, now - lastGfx.timestamp);
-									if (formatted) gfxEl.setAttribute("value", `GFX: ${formatted}%`);
-								}
-								lastGfx.cpuTime = totalGfxCpuTime;
-								lastGfx.timestamp = now;
-							}
-						} catch (e) { console.error("uc_dynamic_spring: ошибка обновления CPU/GFX", e); }
-					};
-
-					updateModules(false);
-					track(win.setInterval(() => updateModules(false), 3000));
-					if (win.gBrowser) {
-						const onTabSelectCpu = () => updateModules(true);
-						win.gBrowser.tabContainer.addEventListener("TabSelect", onTabSelectCpu);
-						cleanups.push(() => win.gBrowser.tabContainer.removeEventListener("TabSelect", onTabSelectCpu));
+					if (CONFIG.modules.CPU > 0 || CONFIG.modules.GFX > 0) {
+						this.startPolling(win);
 					}
-				}
 
-				// --- Модуль: Погода ---
-				if (CONFIG.modules.WEATHER > 0) {
-					let weatherBox = aDocument.createXULElement("hbox");
-					weatherBox.id = "uc-module-weather";
-					weatherBox.className = "uc-module weather-widget";
+					// --- Модуль: Погода ---
+					if (CONFIG.modules.WEATHER > 0) {
+						let weatherBox = aDocument.createXULElement("hbox");
+						weatherBox.id = "uc-module-weather";
+						weatherBox.className = "uc-module weather-widget";
 
-					let weatherIcon = aDocument.createXULElement("image");
-					weatherIcon.id = "uc-module-weather-icon";
-					weatherIcon.className = "weather-icon";
+						let weatherIcon = aDocument.createXULElement("image");
+						weatherIcon.id = "uc-module-weather-icon";
+						weatherIcon.className = "weather-icon";
 
-					let weatherTemp = aDocument.createXULElement("label");
-					weatherTemp.id = "uc-module-weather-temp";
-					weatherTemp.setAttribute("value", "--°C");
+						let weatherTemp = aDocument.createXULElement("label");
+						weatherTemp.id = "uc-module-weather-temp";
+						weatherTemp.setAttribute("value", "--°C");
 
-					weatherBox.appendChild(weatherIcon);
-					weatherBox.appendChild(weatherTemp);
+						weatherBox.appendChild(weatherIcon);
+						weatherBox.appendChild(weatherTemp);
 
-					(CONFIG.modules.WEATHER === 1 ? leftBox : rightBox).appendChild(weatherBox);
+						if (CONFIG.modules.WEATHER === 1) leftBox.appendChild(weatherBox);
+						else if (CONFIG.modules.WEATHER === 2) rightBox.appendChild(weatherBox);
 
-					const updateWeatherValue = async () => {
-						try {
-							const weatherFile = PathUtils.join(PathUtils.profileDir, "activity-stream.weather_feed.json");
-							if (!(await IOUtils.exists(weatherFile))) return;
+						this.startWeatherPolling(win);
+					}
 
-							const data = await IOUtils.readJSON(weatherFile);
+					// --- Модуль: Дата ---
+					if (CONFIG.modules.DATEW > 0) {
+						let dateEl = aDocument.createXULElement("label");
+						dateEl.id = "uc-module-date";
+						dateEl.className = "uc-module";
+						dateEl.setAttribute("value", "Дата");
 
-							if (data?.locationData?.city) {
-								weatherBox.setAttribute("tooltiptext", data.locationData.city);
-							} else {
-								weatherBox.removeAttribute("tooltiptext");
-							}
+						if (CONFIG.modules.DATEW === 1) leftBox.appendChild(dateEl);
+						else if (CONFIG.modules.DATEW === 2) rightBox.appendChild(dateEl);
 
-							const conditions = data?.weather?.suggestions?.[0]?.current_conditions;
+						this.startDatePolling(win);
+					}
 
-							if (conditions && conditions.temperature?.c !== undefined) {
-								let currentTemp = conditions.temperature.c;
-								weatherTemp.setAttribute("value", `${currentTemp > 0 ? "+" + currentTemp : currentTemp}°C`);
+					win.setTimeout(() => this.updateTitle(win), 500);
 
-								const iconId = conditions.icon_id;
-								if (iconId && CONFIG.modules.WICONS) {
-									weatherIcon.setAttribute("class", `weather-icon iconId${iconId}`);
-									weatherIcon.style.display = "block";
-								} else {
-									weatherIcon.setAttribute("class", "weather-icon");
-									weatherIcon.style.display = "none";
-								}
-							} else {
-								weatherTemp.setAttribute("value", "--°C");
-								weatherIcon.setAttribute("class", "weather-icon");
-								weatherIcon.style.display = "none";
-							}
-						} catch (e) {}
-					};
+					return spring;
+				}.bind(this)
+			});
 
-					track(win.setTimeout(updateWeatherValue, 5100));
-					track(win.setInterval(updateWeatherValue, 180000));
-				}
-
-				// --- Модуль: Дата ---
-				if (CONFIG.modules.DATEW > 0) {
-					let dateEl = aDocument.createXULElement("label");
-					dateEl.id = "uc-module-date";
-					dateEl.className = "uc-module";
-					dateEl.setAttribute("value", "Дата");
-					(CONFIG.modules.DATEW === 1 ? leftBox : rightBox).appendChild(dateEl);
-
-					let lastCheckedDate = null;
-
-					const updatePovodTooltip = async () => {
-						const PREF_LAST = "uc.module.date.povod.last_update";
-						const PREF_DATA = "uc.module.date.povod.cached_json"; // Храним сырые данные, а не текст
-
-						const SOURCES = [
-							"https://raw.githubusercontent.com/KotDaVinci-1/FirefoxChromeScripts/main/holidays/povod.json",
-							"https://docs.google.com/spreadsheets/d/1PNqCvPUxSdyyw3zVbemQWE62XfBiHUC7klBt6vuWBvc/export?format=tsv&gid=771050827&range=A:A"
-						];
-
-						let getDDMM = (d) => String(d.getDate()).padStart(2, '0') + '.' + String(d.getMonth() + 1).padStart(2, '0');
-
-						let now = new Date();
-						let todayFull = getDDMM(now) + '.' + now.getFullYear();
-
-						let data = null;
-						let isOfflineCache = false;
-						let lastUpdate = "";
-
-						try { lastUpdate = Services.prefs.getStringPref(PREF_LAST, ""); } catch(e) {}
-
-						// 1. Сетевой запрос нужен только если сегодня еще не обновляли
-						if (lastUpdate !== todayFull) {
-							dateEl.setAttribute("tooltiptext", "Сверяемся с календарем...");
-
-							for (let url of SOURCES) {
-								try {
-									let response = await fetch(url, { cache: "no-store" });
-									if (!response.ok) throw new Error("HTTP " + response.status);
-
-									data = JSON.parse(await response.text());
-									Services.prefs.setStringPref(PREF_DATA, JSON.stringify(data));
-									Services.prefs.setStringPref(PREF_LAST, todayFull);
-									break;
-								} catch (e) { console.warn(`uc_dynamic_spring: Источник недоступен (${url})`); }
-							}
-						}
-
-						// 2. Читаем из кэша, если сеть упала ИЛИ если сегодня уже скачивали данные
-						if (!data) {
-							try {
-								let cachedStr = Services.prefs.getStringPref(PREF_DATA, "");
-								if (cachedStr) {
-									data = JSON.parse(cachedStr);
-									if (lastUpdate !== todayFull) isOfflineCache = true;
-								}
-							} catch(e) { console.error("uc_dynamic_spring: Ошибка чтения кэша", e); }
-						}
-
-						if (!data) {
-							dateEl.setAttribute("tooltiptext", "Не удалось загрузить праздники");
-							return;
-						}
-
-						let todayDDMM = getDDMM(now);
-						let tomorrow = new Date(now);
-						tomorrow.setDate(tomorrow.getDate() + 1);
-						let tomorrowDDMM = getDDMM(tomorrow);
-
-						let todayHolidays = data[todayDDMM];
-						let tomorrowHolidays = data[tomorrowDDMM];
-						let tooltipText = "";
-
-						if (todayHolidays || tomorrowHolidays) {
-							let parts = [];
-							if (todayHolidays) parts.push("Праздник(и) сегодня:\n" + todayHolidays.join("\n"));
-							if (tomorrowHolidays) parts.push("Праздник(и) завтра:\n" + tomorrowHolidays.join("\n"));
-							tooltipText = parts.join("\n\n");
-						} else {
-							let nextDate = new Date(now);
-							let found = false;
-							for (let i = 2; i <= 200; i++) {
-								nextDate.setDate(nextDate.getDate() + 1);
-								let nextDDMM = getDDMM(nextDate);
-
-								if (data[nextDDMM]) {
-									tooltipText = `Ближайший праздник (${nextDDMM}):\n` + data[nextDDMM].join("\n");
-									found = true;
-									break;
-								}
-							}
-							if (!found) tooltipText = "Нет предстоящих праздников в базе.";
-						}
-
-						if (isOfflineCache) {
-							tooltipText += "\n\n[Нет сети. Используется кэш]";
-						}
-
-						dateEl.setAttribute("tooltiptext", tooltipText);
-					};
-
-					const updateDateValue = () => {
-						let now = new Date();
-						let currentDate = now.getDate();
-
-						if (lastCheckedDate === currentDate) return;
-						lastCheckedDate = currentDate;
-
-						let options = { weekday: 'short', day: 'numeric', month: 'short' };
-						let dateStr = now.toLocaleDateString('ru-RU', options);
-
-						dateStr = dateStr.charAt(0).toUpperCase() + dateStr.slice(1);
-						dateStr = dateStr.replace(/\.$/, '');
-						dateEl.setAttribute("value", dateStr);
-
-						if (CONFIG.modules.POVOD) {
-							updatePovodTooltip();
-						} else {
-							dateEl.removeAttribute("tooltiptext");
-						}
-					};
-
-					updateDateValue();
-					track(win.setTimeout(updateDateValue, 5000));
-					track(win.setInterval(updateDateValue, 60000));
-				}
-
-				// Сохраняем функцию очистки для этого конкретного окна
-				perWindowCleanup.set(win, () => {
-					timers.forEach((id) => { win.clearTimeout(id); win.clearInterval(id); });
-					cleanups.forEach((fn) => { try { fn(); } catch (e) {} });
+			if (CONFIG.modules.BASIS === 2 && window.gBrowser) {
+				window.gBrowser.tabContainer.addEventListener("TabSelect", () => this.updateTitle(window));
+				window.gBrowser.tabContainer.addEventListener("TabAttrModified", (event) => {
+					if (event.detail.changed.includes("label") && event.target === window.gBrowser.selectedTab) {
+						this.updateTitle(window);
+					}
 				});
+				window.gBrowser.addTabsProgressListener({
+					onLocationChange(aBrowser) {
+						if (aBrowser === window.gBrowser.selectedBrowser) {
+							window.UCDynamicSpring.updateTitle(window);
+						}
+					}
+				});
+			}
+		},
 
-				return spring;
-			},
+		updateTitle: function(win) {
+			let titleEl = win.document.getElementById("uc-dynamic-title");
+			if (titleEl && win.gBrowser && win.gBrowser.selectedTab) {
+				titleEl.setAttribute("value", win.gBrowser.selectedTab.label || "");
+			}
+		},
 
-			onDestroyed: function(aDocument) {
-				const win = aDocument.defaultView;
-				const cleanup = perWindowCleanup.get(win);
-				if (cleanup) {
-					try { cleanup(); } catch (e) {}
-					perWindowCleanup.delete(win);
+		updateMemoryValue: async function(win) {
+			let memEl = win.document.getElementById("uc-module-memory");
+			if (!memEl || !win.gBrowser || !win.gBrowser.selectedBrowser) return;
+
+			try {
+				const procInfo = await ChromeUtils.requestProcInfo();
+				const outerWindowId = win.gBrowser.selectedBrowser.outerWindowID;
+				let memory = '--';
+
+				for (const childProc of procInfo.children) {
+					if (childProc.windows) {
+						for (const w of childProc.windows) {
+							if (w.outerWindowId === outerWindowId) {
+								let memNumber = Math.round(childProc.memory / (1024 * 1024));
+								memory = String(memNumber).padStart(4, '\u2007');
+								break;
+							}
+						}
+					}
+				}
+				memEl.setAttribute("value", `Mem: ${memory} MB`);
+			} catch (e) {}
+		},
+
+		updateWeatherValue: async function(win) {
+			let tempEl = win.document.getElementById("uc-module-weather-temp");
+			let iconEl = win.document.getElementById("uc-module-weather-icon");
+			let weatherBox = win.document.getElementById("uc-module-weather");
+			if (!tempEl || !iconEl || !weatherBox) return;
+
+			try {
+				const weatherFile = PathUtils.join(PathUtils.profileDir, "activity-stream.weather_feed.json");
+				if (!(await IOUtils.exists(weatherFile))) return;
+
+				const data = await IOUtils.readJSON(weatherFile);
+
+				if (data?.locationData?.city) {
+					weatherBox.setAttribute("tooltiptext", data.locationData.city);
+				} else {
+					weatherBox.removeAttribute("tooltiptext");
+				}
+
+				const conditions = data?.weather?.suggestions?.[0]?.current_conditions;
+
+				if (conditions && conditions.temperature?.c !== undefined) {
+					let currentTemp = conditions.temperature.c;
+					tempEl.setAttribute("value", `${currentTemp > 0 ? "+" + currentTemp : currentTemp}°C`);
+
+					const iconId = conditions.icon_id;
+					if (iconId && CONFIG.modules.WICONS) {
+						iconEl.setAttribute("class", `weather-icon iconId${iconId}`);
+						iconEl.style.display = "block";
+					} else {
+						iconEl.setAttribute("class", "weather-icon");
+						iconEl.style.display = "none";
+					}
+				} else {
+					tempEl.setAttribute("value", "--°C");
+					iconEl.setAttribute("class", "weather-icon");
+					iconEl.style.display = "none";
+				}
+			} catch (e) {}
+		},
+
+		_lastCpu: new WeakMap(),
+		_lastGfx: new WeakMap(),
+
+		_formatCpuPercent: function(win, cpuDelta, timeDelta) {
+			if (timeDelta <= 0 || cpuDelta < 0) return null;
+			const cores = win.navigator.hardwareConcurrency || 1;
+			let percent = (cpuDelta / (timeDelta * 10000) / cores).toFixed(1);
+			return String(percent).padStart(4, '\u2007');
+		},
+
+		updateModules: async function(win, isTabSelect = false) {
+			let cpuEl = win.document.getElementById("uc-module-cpu");
+			let gfxEl = win.document.getElementById("uc-module-gfx");
+			if (!cpuEl && !gfxEl) return;
+
+			try {
+				const procInfo = await ChromeUtils.requestProcInfo();
+				const now = Date.now();
+				const outerWindowId = win.gBrowser?.selectedBrowser?.outerWindowID;
+
+				let currentTabCpuTime = 0;
+				let currentTabPid = null;
+				let totalGfxCpuTime = 0;
+
+				for (const childProc of procInfo.children) {
+					if (gfxEl && !isTabSelect && (childProc.type === 'gpu' || childProc.type === 'rdd' || childProc.type === 'utility')) {
+						totalGfxCpuTime += childProc.cpuTime;
+					}
+					if (cpuEl && outerWindowId && childProc.windows) {
+						for (const w of childProc.windows) {
+							if (w.outerWindowId === outerWindowId) {
+								currentTabCpuTime = childProc.cpuTime;
+								currentTabPid = childProc.pid;
+							}
+						}
+					}
+				}
+
+				let lastCpu = this._lastCpu.get(win) || { pid: null, cpuTime: 0, timestamp: 0 };
+				let lastGfx = this._lastGfx.get(win) || { cpuTime: 0, timestamp: 0 };
+
+				if (cpuEl && currentTabPid) {
+					if (lastCpu.pid !== currentTabPid) {
+						lastCpu = { pid: currentTabPid, cpuTime: currentTabCpuTime, timestamp: now };
+						cpuEl.setAttribute("value", `CPU: \u2007\u2007--%`);
+					} else if (lastCpu.timestamp > 0) {
+						const formatted = this._formatCpuPercent(
+							win,
+							currentTabCpuTime - lastCpu.cpuTime,
+							now - lastCpu.timestamp
+						);
+						if (formatted) cpuEl.setAttribute("value", `CPU: ${formatted}%`);
+						lastCpu.cpuTime = currentTabCpuTime;
+						lastCpu.timestamp = now;
+					}
+					this._lastCpu.set(win, lastCpu);
+				}
+
+				if (gfxEl && !isTabSelect) {
+					if (lastGfx.timestamp > 0) {
+						const formatted = this._formatCpuPercent(
+							win,
+							totalGfxCpuTime - lastGfx.cpuTime,
+							now - lastGfx.timestamp
+						);
+						if (formatted) gfxEl.setAttribute("value", `GFX: ${formatted}%`);
+					}
+					lastGfx.cpuTime = totalGfxCpuTime;
+					lastGfx.timestamp = now;
+					this._lastGfx.set(win, lastGfx);
+				}
+
+			} catch (e) {}
+		},
+
+		_lastCheckedDates: new WeakMap(),
+
+		updateDateValue: function(win) {
+			let dateEl = win.document.getElementById("uc-module-date");
+			if (!dateEl) return;
+
+			let now = new Date();
+			let currentDate = now.getDate();
+
+			if (this._lastCheckedDates.get(win) === currentDate) return;
+			this._lastCheckedDates.set(win, currentDate);
+
+			let options = { weekday: 'short', day: 'numeric', month: 'short' };
+			let dateStr = now.toLocaleDateString('ru-RU', options);
+
+			dateStr = dateStr.charAt(0).toUpperCase() + dateStr.slice(1);
+			dateStr = dateStr.replace(/\.$/, '');
+			dateEl.setAttribute("value", dateStr);
+
+			if (CONFIG.modules.POVOD) {
+				this.updatePovodTooltip(dateEl);
+			} else {
+				dateEl.removeAttribute("tooltiptext");
+			}
+		},
+
+		updatePovodTooltip: async function(dateEl) {
+			const PREF_LAST = "uc.module.date.povod.last_update";
+			const PREF_DATA = "uc.module.date.povod.cached_json";
+
+			const SOURCES = [
+				"https://raw.githubusercontent.com/KotDaVinci-1/FirefoxChromeScripts/main/holidays/povod.json",
+				"https://docs.google.com/spreadsheets/d/1PNqCvPUxSdyyw3zVbemQWE62XfBiHUC7klBt6vuWBvc/export?format=tsv&gid=771050827&range=A:A"
+			];
+
+			let getDDMM = (d) => String(d.getDate()).padStart(2, '0') + '.' + String(d.getMonth() + 1).padStart(2, '0');
+
+			let now = new Date();
+			let todayFull = getDDMM(now) + '.' + now.getFullYear();
+
+			let data = null;
+			let isOfflineCache = false;
+			let lastUpdate = "";
+
+			try { lastUpdate = Services.prefs.getStringPref(PREF_LAST, ""); } catch(e) {}
+
+			if (lastUpdate !== todayFull) {
+				dateEl.setAttribute("tooltiptext", "Сверяемся с календарем...");
+
+				for (let url of SOURCES) {
+					try {
+						let response = await fetch(url, { cache: "no-store" });
+						if (!response.ok) throw new Error("HTTP " + response.status);
+
+						data = JSON.parse(await response.text());
+						Services.prefs.setStringPref(PREF_DATA, JSON.stringify(data));
+						Services.prefs.setStringPref(PREF_LAST, todayFull);
+						break;
+					} catch (e) {}
 				}
 			}
-		});
+
+			if (!data) {
+				try {
+					let cachedStr = Services.prefs.getStringPref(PREF_DATA, "");
+					if (cachedStr) {
+						data = JSON.parse(cachedStr);
+						if (lastUpdate !== todayFull) isOfflineCache = true;
+					}
+				} catch(e) {}
+			}
+
+			if (!data) {
+				dateEl.setAttribute("tooltiptext", "Не удалось загрузить праздники");
+				return;
+			}
+
+			let todayDDMM = getDDMM(now);
+			let tomorrow = new Date(now);
+			tomorrow.setDate(tomorrow.getDate() + 1);
+			let tomorrowDDMM = getDDMM(tomorrow);
+
+			let todayHolidays = data[todayDDMM];
+			let tomorrowHolidays = data[tomorrowDDMM];
+			let tooltipText = "";
+
+			if (todayHolidays || tomorrowHolidays) {
+				let parts = [];
+				if (todayHolidays) parts.push("Праздник(и) сегодня:\n" + todayHolidays.join("\n"));
+				if (tomorrowHolidays) parts.push("Праздник(и) завтра:\n" + tomorrowHolidays.join("\n"));
+				tooltipText = parts.join("\n\n");
+			} else {
+				let nextDate = new Date(now);
+				let found = false;
+				for (let i = 2; i <= 200; i++) {
+					nextDate.setDate(nextDate.getDate() + 1);
+					let nextDDMM = getDDMM(nextDate);
+
+					if (data[nextDDMM]) {
+						tooltipText = `Ближайший праздник (${nextDDMM}):\n` + data[nextDDMM].join("\n");
+						found = true;
+						break;
+					}
+				}
+				if (!found) tooltipText = "Нет предстоящих праздников в базе.";
+			}
+
+			if (isOfflineCache) {
+				tooltipText += "\n\n[Нет сети. Используется кэш]";
+			}
+
+			dateEl.setAttribute("tooltiptext", tooltipText);
+		},
+
+		startMemoryPolling: function(win) {
+			this.updateMemoryValue(win);
+			win.setInterval(() => this.updateMemoryValue(win), 3000);
+			if (win.gBrowser) {
+				win.gBrowser.tabContainer.addEventListener("TabSelect", () => this.updateMemoryValue(win));
+			}
+		},
+
+		startPolling: function(win) {
+			this.updateModules(win, false);
+			win.setInterval(() => this.updateModules(win, false), 3000);
+
+			if (win.gBrowser) {
+				win.gBrowser.tabContainer.addEventListener("TabSelect", () => this.updateModules(win, true));
+			}
+		},
+
+		startWeatherPolling: function(win) {
+			win.setTimeout(() => this.updateWeatherValue(win), 5500);
+			win.setInterval(() => this.updateWeatherValue(win), 180000);
+		},
+
+		startDatePolling: function(win) {
+			this.updateDateValue(win);
+			win.setTimeout(() => this.updateDateValue(win), 5000);
+			win.setInterval(() => this.updateDateValue(win), 60000);
+		}
+	};
+
+	if (gBrowserInit.delayedStartupFinished) {
+		window.UCDynamicSpring.init();
+	} else {
+		let delayedListener = (subject, topic) => {
+			if (topic == "browser-delayed-startup-finished" && subject == window) {
+				Services.obs.removeObserver(delayedListener, topic);
+				window.UCDynamicSpring.init();
+			}
+		};
+		Services.obs.addObserver(delayedListener, "browser-delayed-startup-finished");
 	}
 })();
