@@ -2,6 +2,7 @@
 // @name			Инфо-пробел
 // @description		Расширяющийся пробел с заголовком и виджетами
 // @compatibility	Firefox 153
+// @version			1.1.2 Фикс зависших заголовков страниц в новых окнах.
 // @version			1.1.1 Рефакторинг. Исправлен некорректный шрифт на "родных" панелях браузера при загрузке браузера для загрузчика UCF.
 // @version			1.1.0 Рефакторинг. Исправлена работа в нескольких окнах браузера.
 // @version			1.0.4 Фикс потери данных о погоде браузером.
@@ -25,7 +26,7 @@
 			DATEW: 2,		// 0 - Откл; 1 - Слева;  2 - Справа		(дата)
 			BASIS: 2,		// 0 - Только виджеты;	 1 - Виджеты и расширяющийся пробел;   2 - заголовок страницы на расширяющемся пробеле
 			WICONS: true,	// Иконка погоды
-			POVOD: true		// Всплывающая подсказка с праздниками для модуля "дата"
+			POVOD: true		// Всплывающая подсказка с праздниками для модуля "дата" 
 		},
 
 		stylesBase: `
@@ -125,128 +126,133 @@
 				} catch (e) {}
 			}
 
-			CustomizableUI.createWidget({
-				id: "uc_dynamic_spring",
-				type: "custom",
+			// Регистрируем виджет только один раз
+			if (!CustomizableUI.getWidget("uc_dynamic_spring")) {
+				CustomizableUI.createWidget({
+					id: "uc_dynamic_spring",
+					type: "custom",
 
-				onBuild: function(aDocument) {
-					let win = aDocument.defaultView;
-					let spring = aDocument.createXULElement(CONFIG.modules.BASIS > 0 ? "toolbarspring" : "toolbaritem");
-					spring.id = "uc_dynamic_spring";
-					spring.className = "customizableui-space";
-					spring.setAttribute("label", "Инфо-пробел");
+					onBuild: function(aDocument) {
+						let win = aDocument.defaultView;
+						let spring = aDocument.createXULElement(CONFIG.modules.BASIS > 0 ? "toolbarspring" : "toolbaritem");
+						spring.id = "uc_dynamic_spring";
+						spring.className = "customizableui-space";
+						spring.setAttribute("label", "Инфо-пробел");
 
-					let leftBox = aDocument.createXULElement("hbox");
-					leftBox.id = "uc-dynamic-left";
+						let leftBox = aDocument.createXULElement("hbox");
+						leftBox.id = "uc-dynamic-left";
 
-					let rightBox = aDocument.createXULElement("hbox");
-					rightBox.id = "uc-dynamic-right";
+						let rightBox = aDocument.createXULElement("hbox");
+						rightBox.id = "uc-dynamic-right";
 
-					spring.appendChild(leftBox);
+						spring.appendChild(leftBox);
 
-					if (CONFIG.modules.BASIS === 2) {
-						let titleLabel = aDocument.createXULElement("label");
-						titleLabel.id = "uc-dynamic-title";
-						titleLabel.setAttribute("crop", "end");
-						titleLabel.setAttribute("value", "Загрузка...");
-						spring.appendChild(titleLabel);
-					}
-
-					spring.appendChild(rightBox);
-
-					// --- Модуль: Память ---
-					if (CONFIG.modules.MEMORY > 0) {
-						let memLabel = aDocument.createXULElement("label");
-						memLabel.id = "uc-module-memory";
-						memLabel.className = "uc-module";
-						memLabel.setAttribute("value", "Mem: -- MB");
-
-						if (CONFIG.modules.MEMORY === 1) leftBox.appendChild(memLabel);
-						else if (CONFIG.modules.MEMORY === 2) rightBox.appendChild(memLabel);
-
-						this.startMemoryPolling(win);
-					}
-
-					// --- Модуль: CPU ---
-					if (CONFIG.modules.CPU > 0) {
-						let cpuLabel = aDocument.createXULElement("label");
-						cpuLabel.id = "uc-module-cpu";
-						cpuLabel.className = "uc-module";
-						cpuLabel.setAttribute("value", "CPU: \u2007\u2007--%");
-
-						if (CONFIG.modules.CPU === 1) leftBox.appendChild(cpuLabel);
-						else if (CONFIG.modules.CPU === 2) rightBox.appendChild(cpuLabel);
-					}
-
-					// --- Модуль: GFX ---
-					if (CONFIG.modules.GFX > 0) {
-						let gfxLabel = aDocument.createXULElement("label");
-						gfxLabel.id = "uc-module-gfx";
-						gfxLabel.className = "uc-module";
-						gfxLabel.setAttribute("value", "GFX: \u2007\u2007--%");
-
-						if (CONFIG.modules.GFX === 1) leftBox.appendChild(gfxLabel);
-						else if (CONFIG.modules.GFX === 2) rightBox.appendChild(gfxLabel);
-					}
-
-					if (CONFIG.modules.CPU > 0 || CONFIG.modules.GFX > 0) {
-						this.startPolling(win);
-					}
-
-					// --- Модуль: Погода ---
-					if (CONFIG.modules.WEATHER > 0) {
-						let weatherBox = aDocument.createXULElement("hbox");
-						weatherBox.id = "uc-module-weather";
-						weatherBox.className = "uc-module weather-widget";
-
-						let weatherIcon = aDocument.createXULElement("image");
-						weatherIcon.id = "uc-module-weather-icon";
-						weatherIcon.className = "weather-icon";
-
-						let weatherTemp = aDocument.createXULElement("label");
-						weatherTemp.id = "uc-module-weather-temp";
-						weatherTemp.setAttribute("value", "--°C");
-
-						weatherBox.appendChild(weatherIcon);
-						weatherBox.appendChild(weatherTemp);
-
-						if (CONFIG.modules.WEATHER === 1) leftBox.appendChild(weatherBox);
-						else if (CONFIG.modules.WEATHER === 2) rightBox.appendChild(weatherBox);
-
-						this.startWeatherPolling(win);
-					}
-
-					// --- Модуль: Дата ---
-					if (CONFIG.modules.DATEW > 0) {
-						let dateEl = aDocument.createXULElement("label");
-						dateEl.id = "uc-module-date";
-						dateEl.className = "uc-module";
-						dateEl.setAttribute("value", "Дата");
-
-						if (CONFIG.modules.DATEW === 1) leftBox.appendChild(dateEl);
-						else if (CONFIG.modules.DATEW === 2) rightBox.appendChild(dateEl);
-
-						this.startDatePolling(win);
-					}
-
-					win.setTimeout(() => this.updateTitle(win), 500);
-
-					return spring;
-				}.bind(this)
-			});
-
-			if (CONFIG.modules.BASIS === 2 && window.gBrowser) {
-				window.gBrowser.tabContainer.addEventListener("TabSelect", () => this.updateTitle(window));
-				window.gBrowser.tabContainer.addEventListener("TabAttrModified", (event) => {
-					if (event.detail.changed.includes("label") && event.target === window.gBrowser.selectedTab) {
-						this.updateTitle(window);
-					}
-				});
-				window.gBrowser.addTabsProgressListener({
-					onLocationChange(aBrowser) {
-						if (aBrowser === window.gBrowser.selectedBrowser) {
-							window.UCDynamicSpring.updateTitle(window);
+						let titleLabel = null;
+						if (CONFIG.modules.BASIS === 2) {
+							titleLabel = aDocument.createXULElement("label");
+							titleLabel.id = "uc-dynamic-title";
+							titleLabel.setAttribute("crop", "end");
+							titleLabel.setAttribute("value", "Загрузка...");
+							spring.appendChild(titleLabel);
 						}
+
+						spring.appendChild(rightBox);
+
+						// --- Модуль: Память ---
+						if (CONFIG.modules.MEMORY > 0) {
+							let memLabel = aDocument.createXULElement("label");
+							memLabel.id = "uc-module-memory";
+							memLabel.className = "uc-module";
+							memLabel.setAttribute("value", "Mem: -- MB");
+
+							if (CONFIG.modules.MEMORY === 1) leftBox.appendChild(memLabel);
+							else if (CONFIG.modules.MEMORY === 2) rightBox.appendChild(memLabel);
+
+							window.UCDynamicSpring.startMemoryPolling(win);
+						}
+
+						// --- Модуль: CPU ---
+						if (CONFIG.modules.CPU > 0) {
+							let cpuLabel = aDocument.createXULElement("label");
+							cpuLabel.id = "uc-module-cpu";
+							cpuLabel.className = "uc-module";
+							cpuLabel.setAttribute("value", "CPU: \u2007\u2007--%");
+
+							if (CONFIG.modules.CPU === 1) leftBox.appendChild(cpuLabel);
+							else if (CONFIG.modules.CPU === 2) rightBox.appendChild(cpuLabel);
+						}
+
+						// --- Модуль: GFX ---
+						if (CONFIG.modules.GFX > 0) {
+							let gfxLabel = aDocument.createXULElement("label");
+							gfxLabel.id = "uc-module-gfx";
+							gfxLabel.className = "uc-module";
+							gfxLabel.setAttribute("value", "GFX: \u2007\u2007--%");
+
+							if (CONFIG.modules.GFX === 1) leftBox.appendChild(gfxLabel);
+							else if (CONFIG.modules.GFX === 2) rightBox.appendChild(gfxLabel);
+						}
+
+						if (CONFIG.modules.CPU > 0 || CONFIG.modules.GFX > 0) {
+							window.UCDynamicSpring.startPolling(win);
+						}
+
+						// --- Модуль: Погода ---
+						if (CONFIG.modules.WEATHER > 0) {
+							let weatherBox = aDocument.createXULElement("hbox");
+							weatherBox.id = "uc-module-weather";
+							weatherBox.className = "uc-module weather-widget";
+
+							let weatherIcon = aDocument.createXULElement("image");
+							weatherIcon.id = "uc-module-weather-icon";
+							weatherIcon.className = "weather-icon";
+
+							let weatherTemp = aDocument.createXULElement("label");
+							weatherTemp.id = "uc-module-weather-temp";
+							weatherTemp.setAttribute("value", "--°C");
+
+							weatherBox.appendChild(weatherIcon);
+							weatherBox.appendChild(weatherTemp);
+
+							if (CONFIG.modules.WEATHER === 1) leftBox.appendChild(weatherBox);
+							else if (CONFIG.modules.WEATHER === 2) rightBox.appendChild(weatherBox);
+
+							window.UCDynamicSpring.startWeatherPolling(win);
+						}
+
+						// --- Модуль: Дата ---
+						if (CONFIG.modules.DATEW > 0) {
+							let dateEl = aDocument.createXULElement("label");
+							dateEl.id = "uc-module-date";
+							dateEl.className = "uc-module";
+							dateEl.setAttribute("value", "Дата");
+
+							if (CONFIG.modules.DATEW === 1) leftBox.appendChild(dateEl);
+							else if (CONFIG.modules.DATEW === 2) rightBox.appendChild(dateEl);
+
+							window.UCDynamicSpring.startDatePolling(win);
+						}
+
+						// --- Заголовок вкладки (привязан строго к этому окну win) ---
+						if (titleLabel && win.gBrowser) {
+							win.setTimeout(() => window.UCDynamicSpring.updateTitle(win), 500);
+
+							win.gBrowser.tabContainer.addEventListener("TabSelect", () => window.UCDynamicSpring.updateTitle(win));
+							win.gBrowser.tabContainer.addEventListener("TabAttrModified", (event) => {
+								if (event.detail.changed.includes("label") && event.target === win.gBrowser.selectedTab) {
+									window.UCDynamicSpring.updateTitle(win);
+								}
+							});
+							win.gBrowser.addTabsProgressListener({
+								onLocationChange(aBrowser) {
+									if (aBrowser === win.gBrowser.selectedBrowser) {
+										window.UCDynamicSpring.updateTitle(win);
+									}
+								}
+							});
+						}
+
+						return spring;
 					}
 				});
 			}
