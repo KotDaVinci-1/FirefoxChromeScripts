@@ -2,7 +2,9 @@
 // @name			Улучшенный Findbar
 // @description		Добавляет: в Файндбар кнопку с действиями для инпута Файндбара; общий Файндбар для всех вкладок (опционально); Закрытие Файндбара по Ctrl+F (опционально).
 // @compatibility	Firefox 159
+// @version			1.0.2 Фикс синхронизации вкладок
 // @version			1.0.1 Совместимость с FF 159
+// @version			1.0.0 (релиз)
 // @homepage		https://github.com/KotDaVinci-1/FirefoxChromeScripts
 // ==/UserScript==
 
@@ -13,31 +15,22 @@ if (!ChromeUtils.domProcessChild.childID) {
 	// ВКЛ/ВЫКЛ Один файндбар для всех вкладок
 	const FBAR_ALL = true;
 
+	// Глобальный флаг состояния для отслеживания открытия/закрытия панели
+	win._uc_findbar_was_open = false;
+
 	// --- 1. Синхронизация состояния панели поиска между вкладками ---
 	if (FBAR_ALL) {
 		win.gBrowser.tabContainer.addEventListener("TabSelect", async (e) => {
-			let prevTab = e.detail.previousTab;
-			let currentTab = e.target;
-			let prevFindbar = prevTab?._findBar;
-			let currentFindbar = currentTab?._findBar || win.gFindBar;
-			let wasOpen = prevFindbar && !prevFindbar.hidden;
+			// Если панель не должна быть открыта — ничего не делаем
+			if (!win._uc_findbar_was_open) return;
 
-			if (wasOpen) {
-				if (!currentFindbar) {
-					await win.gBrowser.getFindBar();
-					currentFindbar = currentTab._findBar || win.gFindBar;
-				}
-				if (currentFindbar && currentFindbar.hidden) {
-					currentFindbar.setAttribute("noanim", "true");
-					currentFindbar.open();
-					win.setTimeout(() => currentFindbar.removeAttribute("noanim"), 50);
-					if (currentFindbar._findField?.value) {
-						currentFindbar._enableFindButtons(true);
-					}
-				}
-			} else {
-				if (currentFindbar && !currentFindbar.hidden) {
-					currentFindbar.close(true); 
+			let findbar = await win.gBrowser.getFindBar();
+			if (findbar && findbar.hidden) {
+				findbar.setAttribute("noanim", "true");
+				findbar.open();
+				win.setTimeout(() => findbar.removeAttribute("noanim"), 50);
+				if (findbar._findField?.value) {
+					findbar._enableFindButtons(true);
 				}
 			}
 		});
@@ -59,6 +52,22 @@ if (!ChromeUtils.domProcessChild.childID) {
 	// --- 3. Кастомизация элементов панели поиска ---
 	function initFindbarModifications(findbar) {
 		if (!findbar || typeof findbar.hasAttribute !== "function") return;
+
+		// Перехватываем стандартные методы open и close для надежного отслеживания состояния
+		if (!findbar._uc_hooked) {
+			findbar._uc_hooked = true;
+			let origOpen = findbar.open;
+			findbar.open = function(...args) {
+				win._uc_findbar_was_open = true;
+				return origOpen.apply(this, args);
+			};
+			let origClose = findbar.close;
+			findbar.close = function(...args) {
+				win._uc_findbar_was_open = false;
+				return origClose.apply(this, args);
+			};
+		}
+
 		if (findbar.hasAttribute("uc-customized")) return;
 		findbar.setAttribute("uc-customized", "true");
 
@@ -149,7 +158,6 @@ if (!ChromeUtils.domProcessChild.childID) {
 		}
 	}
 
-	// Гибкий перехват инициализации панели в FF 159+
 	win.gBrowser.tabContainer.addEventListener("TabFindInitialized", (e) => {
 		let targetFindbar = e.detail?.findBar || e.target?._findBar || (e.target?.localName === "findbar" ? e.target : null) || win.gFindBar;
 		initFindbarModifications(targetFindbar);
