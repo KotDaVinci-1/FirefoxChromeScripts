@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name			Улучшенный Findbar
 // @description		Добавляет: в Файндбар кнопку с действиями для инпута Файндбара; общий Файндбар для всех вкладок (опционально); Закрытие Файндбара по Ctrl+F (опционально).
-// @compatibility	Firefox 152
-// @version			1.0.0 (релиз)
+// @compatibility	Firefox 159
+// @version			1.0.1 Совместимость с FF 159
 // @homepage		https://github.com/KotDaVinci-1/FirefoxChromeScripts
 // ==/UserScript==
 
@@ -18,20 +18,20 @@ if (!ChromeUtils.domProcessChild.childID) {
 		win.gBrowser.tabContainer.addEventListener("TabSelect", async (e) => {
 			let prevTab = e.detail.previousTab;
 			let currentTab = e.target;
-			let prevFindbar = prevTab._findBar;
-			let currentFindbar = currentTab._findBar;
+			let prevFindbar = prevTab?._findBar;
+			let currentFindbar = currentTab?._findBar || win.gFindBar;
 			let wasOpen = prevFindbar && !prevFindbar.hidden;
 
 			if (wasOpen) {
 				if (!currentFindbar) {
 					await win.gBrowser.getFindBar();
-					currentFindbar = currentTab._findBar;
+					currentFindbar = currentTab._findBar || win.gFindBar;
 				}
 				if (currentFindbar && currentFindbar.hidden) {
 					currentFindbar.setAttribute("noanim", "true");
 					currentFindbar.open();
 					win.setTimeout(() => currentFindbar.removeAttribute("noanim"), 50);
-					if (currentFindbar._findField.value) {
+					if (currentFindbar._findField?.value) {
 						currentFindbar._enableFindButtons(true);
 					}
 				}
@@ -58,6 +58,7 @@ if (!ChromeUtils.domProcessChild.childID) {
 
 	// --- 3. Кастомизация элементов панели поиска ---
 	function initFindbarModifications(findbar) {
+		if (!findbar || typeof findbar.hasAttribute !== "function") return;
 		if (findbar.hasAttribute("uc-customized")) return;
 		findbar.setAttribute("uc-customized", "true");
 
@@ -108,8 +109,9 @@ if (!ChromeUtils.domProcessChild.childID) {
 				// СКМ: асинхронный захват выделенного текста
 				let selectedText = "";
 				try {
-					if (findbar.browser?.finder?.getInitialSelection) {
-						let selData = await findbar.browser.finder.getInitialSelection();
+					let finder = findbar.browser?.finder || win.gBrowser?.selectedBrowser?.finder;
+					if (finder?.getInitialSelection) {
+						let selData = await finder.getInitialSelection();
 						if (typeof selData === "string") {
 							selectedText = selData;
 						} else if (selData && selData.selectedText) {
@@ -140,13 +142,16 @@ if (!ChromeUtils.domProcessChild.childID) {
 		}
 	}
 
+	if (win.gFindBar) { initFindbarModifications(win.gFindBar); }
 	for (let tab of win.gBrowser.tabs) {
 		if (tab._findBar) {
 			initFindbarModifications(tab._findBar);
 		}
 	}
 
+	// Гибкий перехват инициализации панели в FF 159+
 	win.gBrowser.tabContainer.addEventListener("TabFindInitialized", (e) => {
-		initFindbarModifications(e.target._findBar);
+		let targetFindbar = e.detail?.findBar || e.target?._findBar || (e.target?.localName === "findbar" ? e.target : null) || win.gFindBar;
+		initFindbarModifications(targetFindbar);
 	});
 }
